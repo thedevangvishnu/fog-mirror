@@ -61,7 +61,10 @@ class FogMirrorApp {
     // Audio & Canvas hooks
     this.fog.onWipeMove = (distance, isFist, speed) => {
       if (isFist) {
-        this.audio.playGlassSqueak(distance);
+        // A held fist can drift by a few pixels as the landmarks settle.
+        if (distance >= 2 && speed >= 90) {
+          this.audio.playGlassSqueak(distance);
+        }
       } else {
         this.pencilSpeed = speed;
         this.pencilMovedAt = performance.now();
