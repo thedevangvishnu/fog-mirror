@@ -28,6 +28,14 @@ export interface HandPointer {
   slot: number;
 }
 
+interface PhotoHand {
+  slot: number;
+  corner: { x: number; y: number };
+  thumbX: number;
+  indexY: number;
+  pinched: boolean;
+}
+
 interface LandmarkFilterPair {
   x: OneEuroFilter;
   y: OneEuroFilter;
@@ -45,6 +53,10 @@ export class VisionEngine {
   }));
   private tools: ('hover' | 'pencil' | 'fist')[] = ['hover', 'hover'];
   private fistSamples = [0, 0];
+  private framingSince: number | null = null;
+  private armedUntil = 0;
+  private photoFrame: PhotoHand['corner'][] = [];
+  private shutterLatched = false;
 
   public mouthThreshold: number = 0.14;
   public pinchThreshold: number = 0.040;
@@ -94,6 +106,8 @@ export class VisionEngine {
   processFrame(video: HTMLVideoElement): {
     breath: BreathDetectionResult;
     pointers: HandPointer[];
+    photoFrame?: PhotoHand['corner'][];
+    takePhoto?: boolean;
   } | null {
     if (!this.isReady || !this.faceLandmarker || !this.gestureRecognizer) {
       return {
@@ -194,6 +208,7 @@ export class VisionEngine {
     }
 
     const pointers: HandPointer[] = [];
+    const photoHands: PhotoHand[] = [];
     try {
       const results = this.gestureRecognizer.recognizeForVideo(video, nowMs);
       const aspect = video.videoWidth / video.videoHeight || 1;
@@ -219,6 +234,22 @@ export class VisionEngine {
         const inFrame = landmarks.every(point =>
           point.x > 0.01 && point.x < 0.99 && point.y > 0.01 && point.y < 0.99
         );
+
+        if (inFrame) {
+          const thumbX = (thumbTip.x - indexBase.x) * aspect / palmScale;
+          const thumbY = (thumbTip.y - indexBase.y) / palmScale;
+          const indexX = (indexTip.x - indexBase.x) * aspect / palmScale;
+          const indexY = (indexTip.y - indexBase.y) / palmScale;
+          const isL = Math.abs(thumbX) > 0.35 && Math.abs(thumbX) > Math.abs(thumbY) &&
+            Math.abs(indexY) > 0.45 && Math.abs(indexY) > Math.abs(indexX);
+          photoHands.push({
+            slot,
+            corner: { x: 1 - indexBase.x, y: thumbTip.y },
+            thumbX: isL ? -thumbX : 0,
+            indexY: isL ? indexY : 0,
+            pinched: pinchGap < 0.24
+          });
+        }
 
         const previousTool = this.tools[slot];
         const gesture = results.gestures[index]?.[0];
@@ -252,6 +283,7 @@ export class VisionEngine {
       }
     } catch {
       pointers.length = 0;
+      photoHands.length = 0;
     }
 
     for (const [slot, filters] of this.pointerFilters.entries()) {
@@ -262,6 +294,54 @@ export class VisionEngine {
       this.fistSamples[slot] = 0;
     }
 
-    return { breath, pointers };
+    const takePhoto = this.updateShutter(photoHands, nowMs);
+    if (this.photoFrame.length || this.shutterLatched) {
+      for (const pointer of pointers) {
+        pointer.isPinching = false;
+        pointer.isFist = false;
+      }
+    }
+    return { breath, pointers, photoFrame: this.photoFrame, takePhoto };
+  }
+
+  private updateShutter(hands: PhotoHand[], now: number): boolean {
+    const [left, right] = [...hands].sort((a, b) => a.corner.x - b.corner.x);
+    const twoHands = left && right && left.slot !== right.slot;
+    if (this.shutterLatched) {
+      this.shutterLatched = hands.some(hand => hand.pinched);
+      return false;
+    }
+
+    if (this.armedUntil > now && twoHands) {
+      if (left.pinched && right.pinched) {
+        this.photoFrame = [];
+        this.armedUntil = 0;
+        this.framingSince = null;
+        this.shutterLatched = true;
+        return true;
+      }
+      return false;
+    }
+
+    this.armedUntil = 0;
+    this.photoFrame = [];
+    const formsFrame = twoHands &&
+      right.corner.x - left.corner.x > 0.18 &&
+      Math.abs(right.corner.y - left.corner.y) > 0.13 &&
+      left.thumbX > 0 && right.thumbX < 0 &&
+      left.indexY * (right.corner.y - left.corner.y) > 0 &&
+      right.indexY * (left.corner.y - right.corner.y) > 0;
+
+    if (!formsFrame) {
+      this.framingSince = null;
+      return false;
+    }
+    this.framingSince ??= now;
+    if (now - this.framingSince >= 350) {
+      this.photoFrame = [left.corner, right.corner];
+      this.armedUntil = now + 2000;
+      this.framingSince = null;
+    }
+    return false;
   }
 }

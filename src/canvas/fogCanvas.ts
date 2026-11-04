@@ -35,10 +35,10 @@ export class FogCanvas {
 
   // Droplet particle physics
   private droplets: Droplet[] = [];
-  private lastWipePositions: Map<number, { x: number; y: number; isFist: boolean }> = new Map();
+  private lastWipePositions: Map<number, { x: number; y: number; isFist: boolean; time: number }> = new Map();
 
   // Callbacks
-  public onWipeMove?: (velocity: number) => void;
+  public onWipeMove?: (distance: number, isFist: boolean, speed: number) => void;
   public onDropletFall?: () => void;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -168,9 +168,10 @@ export class FogCanvas {
       : Math.max(3, this.wipeBrushRadius);
 
     const lastPos = this.lastWipePositions.get(pointerId);
+    const time = performance.now();
     if (!lastPos || lastPos.isFist !== isFist) {
       // First frame of contact: stamp initial touch point
-      this.lastWipePositions.set(pointerId, { x, y, isFist });
+      this.lastWipePositions.set(pointerId, { x, y, isFist, time });
       this.offscreenCtx.save();
       this.offscreenCtx.globalCompositeOperation = 'destination-out';
       const grad = this.offscreenCtx.createRadialGradient(
@@ -197,7 +198,7 @@ export class FogCanvas {
       return;
     }
 
-    this.onWipeMove?.(dist);
+    this.onWipeMove?.(dist, isFist, dist * 1000 / Math.max(8, time - lastPos.time));
 
     this.offscreenCtx.save();
     this.offscreenCtx.globalCompositeOperation = 'destination-out';
@@ -228,7 +229,7 @@ export class FogCanvas {
     }
 
     this.offscreenCtx.restore();
-    this.lastWipePositions.set(pointerId, { x, y, isFist });
+    this.lastWipePositions.set(pointerId, { x, y, isFist, time });
   }
 
   resetPointer(pointerId: number): void {

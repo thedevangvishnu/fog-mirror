@@ -1,3 +1,5 @@
+import shutterUrl from './camera-shutter.wav?url';
+
 /**
  * Audio Engine for Fog Mirror
  * Handles:
@@ -19,6 +21,9 @@ export class AudioEngine {
 
   // Sound generator state
   private steamGain: GainNode | null = null;
+  private pencilGain: GainNode | null = null;
+  private pencilFilter: BiquadFilterNode | null = null;
+  private shutterBuffer: AudioBuffer | null = null;
   private lastSqueakTime: number = 0;
 
   async init(micStream?: MediaStream): Promise<void> {
@@ -33,6 +38,15 @@ export class AudioEngine {
 
     if (micStream) {
       this.attachMicrophone(micStream);
+    }
+
+    try {
+      const response = await fetch(shutterUrl);
+      if (response.ok) {
+        this.shutterBuffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
+      }
+    } catch (error) {
+      console.warn('Camera shutter sound could not be loaded:', error);
     }
   }
 
@@ -119,6 +133,12 @@ export class AudioEngine {
     steamFilter.connect(this.steamGain);
     this.steamGain.connect(this.ctx.destination);
 
+    this.pencilFilter = this.ctx.createBiquadFilter();
+    this.pencilFilter.type = 'bandpass';
+    this.pencilFilter.Q.value = 0.65;
+    this.pencilGain = this.ctx.createGain();
+    this.pencilGain.gain.value = 0;
+    whiteNoise.connect(this.pencilFilter).connect(this.pencilGain).connect(this.ctx.destination);
     whiteNoise.start();
   }
 
@@ -129,6 +149,38 @@ export class AudioEngine {
     if (!this.ctx || !this.steamGain || this.isMuted) return;
     const targetGain = Math.max(0, Math.min(0.25, intensity * 0.25));
     this.steamGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.05);
+  }
+
+  playPhotoTick(seconds: number): void {
+    if (!this.ctx || this.isMuted) return;
+    const now = this.ctx.currentTime;
+    const tone = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    tone.frequency.value = seconds === 1 ? 880 : 660;
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.11, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    tone.connect(gain).connect(this.ctx.destination);
+    tone.start(now);
+    tone.stop(now + 0.1);
+  }
+
+  playPhotoShutter(): void {
+    if (!this.ctx || !this.shutterBuffer || this.isMuted) return;
+    const source = this.ctx.createBufferSource();
+    source.buffer = this.shutterBuffer;
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0.25;
+    source.connect(gain).connect(this.ctx.destination);
+    source.start();
+  }
+
+  setPencilSpeed(speed: number): void {
+    if (!this.ctx || !this.pencilGain || !this.pencilFilter) return;
+    const movement = Math.max(0, Math.min(1, (speed - 25) / 550));
+    const now = this.ctx.currentTime;
+    this.pencilGain.gain.setTargetAtTime(this.isMuted ? 0 : movement * 0.16, now, 0.035);
+    this.pencilFilter.frequency.setTargetAtTime(340 + movement * 460, now, 0.05);
   }
 
   /**

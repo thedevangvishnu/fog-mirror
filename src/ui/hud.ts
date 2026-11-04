@@ -6,6 +6,8 @@
 export interface HUDCallbacks {
   onToggleSound: () => boolean;
   onClearFog: () => void;
+  onPhotoTick: (seconds: number) => void;
+  onTakePhoto: () => Promise<Blob>;
   onFullFog: () => void;
   onToggleFullscreen: () => void;
   onUpdateWiperWidth: (radius: number) => void;
@@ -20,7 +22,11 @@ export class HUD {
   private wiperSlider: HTMLInputElement;
   private wiperValueLabel: HTMLElement;
   private pinchSlider: HTMLInputElement;
-  private pinchValueLabel: HTMLElement;
+  private photoCountdown: HTMLElement;
+  private photoFrame: HTMLElement;
+  private photoPreview: HTMLElement;
+  private photoDialog: HTMLDialogElement;
+  private photoUrl: string | null = null;
   private callbacks: HUDCallbacks;
   private isVisible: boolean = true;
 
@@ -64,7 +70,7 @@ export class HUD {
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-settings" title="Adjust Air Pencil Sensitivity">
+        <button class="hud-btn" id="btn-settings" title="Settings" aria-label="Settings">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -77,9 +83,16 @@ export class HUD {
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-clear" title="Clear Glass (C)">
+        <button class="hud-btn" id="btn-clear" title="Erase all fog (C)" aria-label="Erase all fog">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+            <path d="m7 21-4-4a2 2 0 0 1 0-3l9-10a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 8H7Zm0-11 11 10M13 21h9"></path>
+          </svg>
+        </button>
+
+        <button class="hud-btn" id="btn-photo" title="Take photo" aria-label="Take photo">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h4l2-3h4l2 3h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
           </svg>
         </button>
 
@@ -104,19 +117,30 @@ export class HUD {
     this.settingsModal.innerHTML = `
       <div class="modal-box">
         <div class="modal-header">
-          <h3>Interaction Settings</h3>
-          <button class="modal-close" id="settings-close">&times;</button>
+          <h3>Settings</h3>
+          <button class="hud-btn" id="settings-close" aria-label="Close settings">&times;</button>
         </div>
-        <p class="modal-desc">Fine-tune air pencil writing sensitivity.</p>
         
         <div class="modal-field">
-          <label>Pinch Writing Sensitivity: <b id="val-pinch">0.040</b></label>
+          <label for="slider-pinch">Pinch gap</label>
           <input type="range" id="slider-pinch" min="0.025" max="0.070" step="0.002" value="0.040" class="modal-slider" />
-          <span class="field-hint">Touch fingers together to write. Release to instantly lift pencil and write the next letter.</span>
+          <span class="field-hint">Move left if writing starts too early or keeps going after you lift. Move right if a pinch is hard to start.</span>
+        </div>
+
+        <div class="modal-field">
+          <span id="photo-delay-label">Photo timer</span>
+          <div class="photo-timer-options" role="radiogroup" aria-labelledby="photo-delay-label">
+            ${[0, 3, 5, 10].map(seconds => `
+              <label class="hud-btn hud-btn-label">
+                <input type="radio" name="photo-delay" value="${seconds}" ${seconds === 3 ? 'checked' : ''}>
+                ${seconds === 0 ? 'Off' : `${seconds}s`}
+              </label>
+            `).join('')}
+          </div>
         </div>
 
         <div class="modal-actions">
-          <button class="modal-btn primary" id="settings-done">Done</button>
+          <button class="hud-btn hud-btn-label" id="settings-done">Done</button>
         </div>
       </div>
     `;
@@ -127,7 +151,46 @@ export class HUD {
     this.wiperSlider = document.getElementById('slider-wiper') as HTMLInputElement;
     this.wiperValueLabel = document.getElementById('val-wiper')!;
     this.pinchSlider = document.getElementById('slider-pinch') as HTMLInputElement;
-    this.pinchValueLabel = document.getElementById('val-pinch')!;
+    this.photoCountdown = document.createElement('output');
+    this.photoCountdown.className = 'photo-countdown';
+    this.photoCountdown.hidden = true;
+    this.photoFrame = document.createElement('div');
+    this.photoFrame.className = 'photo-frame';
+    this.photoFrame.textContent = 'Pinch both hands';
+    this.photoFrame.hidden = true;
+
+    this.photoPreview = document.createElement('aside');
+    this.photoPreview.className = 'photo-preview';
+    this.photoPreview.hidden = true;
+    this.photoPreview.innerHTML = `
+      <button type="button" data-photo-view aria-label="Open photo preview"><img alt="Latest Fog Mirror photo"></button>
+      <div class="photo-actions">
+        <button type="button" class="hud-btn hud-btn-label" data-photo-view>View</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-save>Save</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-remove>Dismiss</button>
+      </div>
+    `;
+    this.photoDialog = document.createElement('dialog');
+    this.photoDialog.className = 'photo-dialog';
+    this.photoDialog.setAttribute('aria-label', 'Fog Mirror photo');
+    this.photoDialog.innerHTML = `
+      <img alt="Fog Mirror photo">
+      <div class="photo-actions">
+        <button type="button" class="hud-btn hud-btn-label" data-photo-close>Close view</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-save>Save</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-remove>Dismiss</button>
+      </div>
+    `;
+    document.body.append(this.photoCountdown, this.photoFrame, this.photoPreview, this.photoDialog);
+
+    this.photoPreview.querySelectorAll('[data-photo-view]').forEach(button =>
+      button.addEventListener('click', () => this.photoDialog.showModal())
+    );
+    this.photoDialog.querySelector('[data-photo-close]')!.addEventListener('click', () => this.photoDialog.close());
+    for (const panel of [this.photoPreview, this.photoDialog]) {
+      panel.querySelector('[data-photo-remove]')!.addEventListener('click', () => this.dismissPhoto());
+      panel.querySelector('[data-photo-save]')!.addEventListener('click', () => this.savePhoto());
+    }
 
     this.bindEvents();
   }
@@ -137,6 +200,7 @@ export class HUD {
     const btnSettings = document.getElementById('btn-settings')!;
     const btnFog = document.getElementById('btn-fog')!;
     const btnClear = document.getElementById('btn-clear')!;
+    const btnPhoto = document.querySelector<HTMLButtonElement>('#btn-photo')!;
     const btnFullscreen = document.getElementById('btn-fullscreen')!;
     const settingsClose = document.getElementById('settings-close')!;
     const settingsDone = document.getElementById('settings-done')!;
@@ -151,7 +215,6 @@ export class HUD {
     // Pinch sensitivity slider
     this.pinchSlider.addEventListener('input', () => {
       const val = parseFloat(this.pinchSlider.value);
-      this.pinchValueLabel.textContent = val.toFixed(3);
       this.callbacks.onUpdatePinchSensitivity(val);
     });
 
@@ -175,6 +238,7 @@ export class HUD {
 
     btnFog.addEventListener('click', () => this.callbacks.onFullFog());
     btnClear.addEventListener('click', () => this.callbacks.onClearFog());
+    btnPhoto.addEventListener('click', () => void this.startPhoto());
     btnFullscreen.addEventListener('click', () => this.callbacks.onToggleFullscreen());
 
     // Keyboard shortcuts
@@ -191,9 +255,111 @@ export class HUD {
     });
   }
 
+  setPhotoFrame(corners?: { x: number; y: number }[]): void {
+    this.photoFrame.hidden = corners?.length !== 2 ||
+      this.container.querySelector<HTMLButtonElement>('#btn-photo')!.disabled;
+    if (!corners || this.photoFrame.hidden) return;
+    const [a, b] = corners;
+    Object.assign(this.photoFrame.style, {
+      left: `${Math.min(a.x, b.x)}px`,
+      top: `${Math.min(a.y, b.y)}px`,
+      width: `${Math.abs(a.x - b.x)}px`,
+      height: `${Math.abs(a.y - b.y)}px`
+    });
+  }
+
+  async startPhoto(): Promise<void> {
+    const button = this.container.querySelector<HTMLButtonElement>('#btn-photo')!;
+    if (button.disabled) return;
+    const delay = this.settingsModal.querySelector<HTMLInputElement>('input[name=photo-delay]:checked')!;
+    button.disabled = true;
+    this.photoFrame.hidden = true;
+    try {
+      const deadline = performance.now() + Number(delay.value) * 1000;
+      let remaining = deadline - performance.now();
+      let displayedSeconds = 0;
+      while (remaining > 0) {
+        this.photoCountdown.hidden = false;
+        const seconds = Math.ceil(remaining / 1000);
+        if (seconds !== displayedSeconds) {
+          this.photoCountdown.textContent = String(seconds);
+          this.callbacks.onPhotoTick(seconds);
+          displayedSeconds = seconds;
+        }
+        const nextTick = remaining - (seconds - 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, Math.ceil(nextTick)));
+        remaining = deadline - performance.now();
+      }
+      this.photoCountdown.hidden = true;
+      const blob = await this.callbacks.onTakePhoto();
+      this.dismissPhoto();
+      this.photoUrl = URL.createObjectURL(blob);
+      for (const panel of [this.photoPreview, this.photoDialog]) {
+        panel.querySelector('img')!.src = this.photoUrl;
+      }
+      await this.revealPhoto();
+      this.setStatus('');
+    } catch {
+      this.setStatus('Photo unavailable. Check the camera.');
+    } finally {
+      button.disabled = false;
+      this.photoCountdown.hidden = true;
+    }
+  }
+
+  private async revealPhoto(): Promise<void> {
+    this.photoPreview.hidden = false;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const thumbnail = this.photoPreview.querySelector('img')!;
+    this.photoPreview.style.visibility = 'hidden';
+    const still = document.createElement('div');
+    still.className = 'photo-capture-still';
+    still.setAttribute('aria-hidden', 'true');
+    try {
+      await thumbnail.decode();
+      const target = thumbnail.getBoundingClientRect();
+      const image = thumbnail.cloneNode() as HTMLImageElement;
+      image.alt = '';
+      still.append(image, document.createElement('span'));
+      document.body.appendChild(still);
+
+      const start = still.getBoundingClientRect();
+      const landing = `translate(${target.left - start.left}px, ${target.top - start.top}px)
+        scale(${target.width / start.width}, ${target.height / start.height})`;
+      await still.animate([
+        { transform: 'none', offset: 0 },
+        { transform: 'none', offset: 0.2, easing: 'cubic-bezier(0.3, 0.7, 0.2, 1)' },
+        { transform: landing, offset: 1 }
+      ], { duration: 520, fill: 'forwards' }).finished;
+    } finally {
+      still.remove();
+      this.photoPreview.style.removeProperty('visibility');
+    }
+  }
+
+  private dismissPhoto(): void {
+    this.photoDialog.close();
+    this.photoPreview.hidden = true;
+    if (this.photoUrl) URL.revokeObjectURL(this.photoUrl);
+    this.photoUrl = null;
+    for (const panel of [this.photoPreview, this.photoDialog]) {
+      panel.querySelector('img')!.removeAttribute('src');
+    }
+  }
+
+  private savePhoto(): void {
+    if (!this.photoUrl) return;
+    const link = document.createElement('a');
+    link.href = this.photoUrl;
+    link.download = `fog-mirror-${Date.now()}.png`;
+    link.click();
+  }
+
   setStatus(text: string): void {
     if (this.statusText) {
       this.statusText.textContent = text;
+      this.statusText.parentElement!.hidden = !text;
     }
   }
 

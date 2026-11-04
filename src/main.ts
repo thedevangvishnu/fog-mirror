@@ -22,6 +22,8 @@ class FogMirrorApp {
   private isRunning: boolean = false;
   private manualBlowActive: boolean = false;
   private isMouseDown: boolean = false;
+  private pencilSpeed = 0;
+  private pencilMovedAt = -Infinity;
 
   constructor() {
     this.video = document.getElementById('webcam') as HTMLVideoElement;
@@ -38,6 +40,8 @@ class FogMirrorApp {
     this.hud = new HUD({
       onToggleSound: () => this.audio.toggleMute(),
       onClearFog: () => this.fog.clearAllFog(),
+      onPhotoTick: seconds => this.audio.playPhotoTick(seconds),
+      onTakePhoto: () => this.takePhoto(),
       onFullFog: () => this.fog.fullFog(),
       onToggleFullscreen: () => {
         if (!document.fullscreenElement) {
@@ -55,8 +59,13 @@ class FogMirrorApp {
     });
 
     // Audio & Canvas hooks
-    this.fog.onWipeMove = (dist) => {
-      this.audio.playGlassSqueak(dist);
+    this.fog.onWipeMove = (distance, isFist, speed) => {
+      if (isFist) {
+        this.audio.playGlassSqueak(distance);
+      } else {
+        this.pencilSpeed = speed;
+        this.pencilMovedAt = performance.now();
+      }
     };
 
     this.fog.onDropletFall = () => {
@@ -96,7 +105,7 @@ class FogMirrorApp {
         this.hud.setStatus(status);
       });
 
-      this.hud.setStatus('Active — Blow to steam, wipe to clear');
+      this.hud.setStatus('');
       this.isRunning = true;
       requestAnimationFrame(() => this.loop());
     } catch (err: unknown) {
@@ -107,6 +116,33 @@ class FogMirrorApp {
       this.isRunning = true;
       requestAnimationFrame(() => this.loop());
     }
+  }
+
+  private async takePhoto(): Promise<Blob> {
+    const { videoWidth, videoHeight, readyState } = this.video;
+    if (readyState < 2 || !videoWidth || !videoHeight) throw new Error('Camera unavailable');
+
+    const photo = document.createElement('canvas');
+    photo.width = this.canvasElement.width;
+    photo.height = this.canvasElement.height;
+    const ctx = photo.getContext('2d')!;
+    const scale = Math.max(photo.width / videoWidth, photo.height / videoHeight);
+    const width = videoWidth * scale;
+    const height = videoHeight * scale;
+
+    ctx.save();
+    ctx.translate(photo.width, 0);
+    ctx.scale(-1, 1);
+    ctx.filter = getComputedStyle(this.video).filter;
+    ctx.drawImage(this.video, (photo.width - width) / 2, (photo.height - height) / 2, width, height);
+    ctx.restore();
+    ctx.globalAlpha = Number(getComputedStyle(this.canvasElement).opacity);
+    ctx.drawImage(this.canvasElement, 0, 0);
+    this.audio.playPhotoShutter();
+
+    const blob = await new Promise<Blob | null>(resolve => photo.toBlob(resolve, 'image/png'));
+    if (!blob) throw new Error('Photo export failed');
+    return blob;
   }
 
   private loop(): void {
@@ -123,7 +159,13 @@ class FogMirrorApp {
       ? this.vision.processFrame(this.video)
       : null;
     if (sample) {
-      const { breath, pointers } = sample;
+      const { breath, pointers, photoFrame, takePhoto } = sample;
+      const corners = photoFrame?.map(point => this.mapVideoToScreen(point.x, point.y));
+      this.hud.setPhotoFrame(corners);
+      if (takePhoto) void this.hud.startPhoto();
+      if (!this.isMouseDown && !pointers.some(pointer => pointer.isPinching)) {
+        this.pencilMovedAt = -Infinity;
+      }
 
       if (breath.isBlowing) {
         mouthBlow = breath.opennessRatio;
@@ -137,6 +179,7 @@ class FogMirrorApp {
       this.handleVisionPointers(pointers);
     } else if (this.video.readyState < 2) {
       this.handleVisionPointers([]);
+      this.hud.setPhotoFrame();
     }
 
     // 3. Combine Vision + Mic + Spacebar manual blow
@@ -157,6 +200,7 @@ class FogMirrorApp {
     }
 
     this.hud.setBreathIntensity(combinedBlow);
+    this.audio.setPencilSpeed(performance.now() - this.pencilMovedAt < 90 ? this.pencilSpeed : 0);
 
     // 4. Update & render fog physics
     this.fog.updateAndRender();
