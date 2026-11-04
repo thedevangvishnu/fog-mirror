@@ -49,8 +49,6 @@ export class FogCanvas {
     this.offscreenCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: false })!;
 
     this.resize();
-    this.createNoisePattern();
-    this.initInitialFog(0.24); // Mild translucent atmospheric mist: background stays clearly visible
   }
 
   get fistRadius(): number {
