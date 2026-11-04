@@ -39,13 +39,6 @@ class FogMirrorApp {
       onToggleSound: () => this.audio.toggleMute(),
       onClearFog: () => this.fog.clearAllFog(),
       onFullFog: () => this.fog.fullFog(),
-      onUpdateMessage: (msg) => {
-        this.fog.secretMessage = msg;
-      },
-      onToggleMessage: () => {
-        this.fog.showSecretMessage = !this.fog.showSecretMessage;
-        return this.fog.showSecretMessage;
-      },
       onToggleFullscreen: () => {
         if (!document.fullscreenElement) {
           document.documentElement.requestFullscreen();
@@ -142,8 +135,14 @@ class FogMirrorApp {
     }
 
     // 3. Combine Vision + Mic + Spacebar manual blow
-    const manualBlow = this.manualBlowActive ? 0.9 : 0;
-    const combinedBlow = Math.max(mouthBlow, micBreath, manualBlow);
+    // Gated: Ambient microphone noise alone NEVER blows steam if mouth is closed!
+    let combinedBlow = 0;
+    if (this.manualBlowActive) {
+      combinedBlow = 0.9;
+    } else if (mouthBlow > 0.12) {
+      // Vision confirms open/puckered mouth: mic turbulence amplifies the breath volume
+      combinedBlow = Math.max(mouthBlow, micBreath);
+    }
 
     if (combinedBlow > 0.08) {
       this.fog.addBreathSteam(mouthCenter.x, mouthCenter.y, combinedBlow);

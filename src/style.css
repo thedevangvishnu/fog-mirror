@@ -6,19 +6,19 @@
 
 :root {
   --font-apple: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
-  --glass-bg: rgba(18, 24, 34, 0.54);
-  --glass-bg-elevated: rgba(18, 24, 34, 0.72);
-  --glass-blur: blur(36px) saturate(210%) contrast(105%);
-  --glass-border: 1px solid rgba(255, 255, 255, 0.18);
-  --glass-specular: inset 0 1px 0 rgba(255, 255, 255, 0.32), inset 0 -1px 0 rgba(0, 0, 0, 0.22);
-  --glass-shadow: 0 24px 50px -10px rgba(0, 0, 0, 0.5), 0 2px 10px rgba(0, 0, 0, 0.3);
+  --glass-bg: rgba(255, 255, 255, 0.15);
+  --glass-bg-elevated: rgba(255, 255, 255, 0.22);
+  --glass-blur: blur(32px) saturate(190%);
+  --glass-border: 1px solid rgba(255, 255, 255, 0.32);
+  --glass-specular: inset 0 1px 0.5px rgba(255, 255, 255, 0.65), inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 20px 40px rgba(0, 0, 0, 0.25), 0 2px 10px rgba(0, 0, 0, 0.15);
 }
 
 html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #080c10;
+  background-color: #05080c;
   font-family: var(--font-apple);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -46,7 +46,7 @@ html, body {
   object-fit: cover;
   transform: scaleX(-1); /* Flips camera horizontally so it acts like a true mirror */
   z-index: 1;
-  filter: contrast(1.04) brightness(0.98);
+  filter: contrast(1.03) brightness(0.98);
 }
 
 /* Fog & Wipe overlay canvas */
@@ -70,26 +70,26 @@ html, body {
   height: 100%;
   z-index: 3;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.04) 0%, rgba(0, 0, 0, 0.35) 100%);
-  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.5);
+  background: radial-gradient(circle at 50% 25%, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.3) 100%);
+  box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.45);
 }
 
 /* --- Apple Liquid Glass Fingertip Reticles --- */
 .finger-cursor {
   position: absolute;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.12) 0%, transparent 75%);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, transparent 80%);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 4;
-  transition: width 0.18s cubic-bezier(0.16, 1, 0.3, 1),
-              height 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+  transition: width 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+              height 0.15s cubic-bezier(0.16, 1, 0.3, 1),
               opacity 0.2s ease,
               border-color 0.2s ease,
               box-shadow 0.2s ease;
@@ -97,16 +97,16 @@ html, body {
 }
 
 .finger-cursor.active {
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
-/* Precision Pinch Contact Point — luminous condensation droplet */
+/* Precision Air-Pencil Pen Point — luminous crisp contact droplet */
 .finger-cursor.wiping.pinching {
-  width: 20px;
-  height: 20px;
-  border: 1.5px solid rgba(255, 255, 255, 0.95);
-  background: radial-gradient(circle, #ffffff 15%, rgba(210, 230, 248, 0.85) 60%, rgba(210, 230, 248, 0.2) 100%);
-  box-shadow: 0 0 18px rgba(255, 255, 255, 0.75), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  background: radial-gradient(circle, #ffffff 40%, rgba(255, 255, 255, 0.8) 100%);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.9), 0 0 6px #ffffff;
   opacity: 1;
 }
 
@@ -114,15 +114,15 @@ html, body {
 .finger-cursor.wiping.fist {
   width: 72px;
   height: 72px;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 65%, transparent 100%);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.08) 70%, transparent 100%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 0 24px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 28px rgba(255, 255, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   opacity: 1;
 }
 
-/* --- Apple Liquid Glass HUD Pill --- */
+/* --- Apple Liquid White Glass HUD Pill --- */
 .hud-container {
   position: absolute;
   bottom: 28px;
@@ -162,45 +162,46 @@ html, body {
   height: 8px;
   border-radius: 50%;
   background-color: #34d399;
-  box-shadow: 0 0 8px rgba(52, 211, 153, 0.8);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.9);
   animation: pulse-dot 2.5s infinite ease-in-out;
 }
 
 @keyframes pulse-dot {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.92); }
+  50% { opacity: 0.65; transform: scale(0.9); }
 }
 
 .status-label {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.92);
+  color: #ffffff;
   letter-spacing: -0.015em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
   white-space: nowrap;
 }
 
 .breath-indicator {
   width: 76px;
   height: 6px;
-  background: rgba(0, 0, 0, 0.28);
+  background: rgba(0, 0, 0, 0.22);
   border-radius: 999px;
   overflow: hidden;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .breath-bar {
   width: 0%;
   height: 100%;
-  background: linear-gradient(90deg, rgba(200, 225, 245, 0.85), rgba(255, 255, 255, 0.98));
+  background: #ffffff;
   border-radius: 999px;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
   transition: width 0.08s ease-out;
 }
 
 .hud-divider {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .hud-slider-group {
@@ -211,7 +212,7 @@ html, body {
 }
 
 .hud-slider-group .icon {
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .hud-slider {
@@ -219,9 +220,9 @@ html, body {
   appearance: none;
   width: 74px;
   height: 5px;
-  background: rgba(0, 0, 0, 0.32);
+  background: rgba(0, 0, 0, 0.25);
   border-radius: 999px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35), 0 1px 0 rgba(255, 255, 255, 0.2);
   outline: none;
   cursor: pointer;
 }
@@ -234,22 +235,23 @@ html, body {
   border-radius: 50%;
   background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 1px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35), 0 0 1px rgba(0, 0, 0, 0.5);
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease;
 }
 
 .hud-slider::-webkit-slider-thumb:hover {
   transform: scale(1.2);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5), 0 0 6px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45), 0 0 8px rgba(255, 255, 255, 0.6);
 }
 
 .slider-badge {
   font-size: 11px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.7);
-  min-width: 28px;
+  font-weight: 600;
+  color: #ffffff;
+  min-width: 26px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* Glass Action Buttons */
@@ -260,30 +262,28 @@ html, body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  color: #ffffff;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .hud-btn:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
-  transform: translateY(-1px) scale(1.04);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 4px 12px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.28);
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65), 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .hud-btn:active {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.96);
 }
 
 .hud-btn.active {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.28);
-  border-color: rgba(255, 255, 255, 0.35);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 12px rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: inset 0 1px 0 #ffffff, 0 0 12px rgba(255, 255, 255, 0.4);
 }
 
 .hud-btn .icon {
@@ -293,27 +293,32 @@ html, body {
 
 .hud-help-tip {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.8);
   letter-spacing: 0.015em;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .hud-help-tip b {
-  color: rgba(255, 255, 255, 0.9);
+  color: #ffffff;
   font-weight: 600;
 }
 
-/* --- Apple VisionOS Glass Modals & Sheets --- */
+/* --- Apple VisionOS Glass Modals & Sheets (Centered & Beautiful) --- */
 .secret-modal {
   position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 50;
+  z-index: 100;
   transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -324,21 +329,22 @@ html, body {
 
 .modal-box {
   width: 380px;
+  max-width: 90vw;
   background: var(--glass-bg-elevated);
-  backdrop-filter: blur(48px) saturate(220%) contrast(105%);
-  -webkit-backdrop-filter: blur(48px) saturate(220%) contrast(105%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 26px;
+  backdrop-filter: blur(48px) saturate(220%);
+  -webkit-backdrop-filter: blur(48px) saturate(220%);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 28px;
   padding: 24px;
-  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.65),
-              inset 0 1px 0 rgba(255, 255, 255, 0.35),
-              inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  box-shadow: 0 32px 64px -12px rgba(0, 0, 0, 0.45),
+              inset 0 1px 0 rgba(255, 255, 255, 0.7),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.08);
   transform: scale(1);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .secret-modal.hidden .modal-box {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
 
 .modal-header {
@@ -353,15 +359,16 @@ html, body {
   font-weight: 600;
   color: #ffffff;
   letter-spacing: -0.015em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .modal-close {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #ffffff;
   font-size: 18px;
   line-height: 1;
   display: flex;
@@ -372,15 +379,14 @@ html, body {
 }
 
 .modal-close:hover {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.32);
+  transform: scale(1.06);
 }
 
 .modal-desc {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.65);
-  margin-bottom: 20px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 18px;
   line-height: 1.45;
   letter-spacing: -0.01em;
 }
@@ -391,15 +397,16 @@ html, body {
   gap: 10px;
   margin-bottom: 22px;
   padding: 14px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
 }
 
 .modal-field label {
   font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.9);
+  color: #ffffff;
   display: flex;
   justify-content: space-between;
 }
@@ -407,6 +414,7 @@ html, body {
 .modal-field label b {
   color: #ffffff;
   font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .modal-slider {
@@ -414,7 +422,7 @@ html, body {
   -webkit-appearance: none;
   appearance: none;
   height: 5px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 999px;
   outline: none;
   cursor: pointer;
@@ -428,33 +436,13 @@ html, body {
   border-radius: 50%;
   background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
 }
 
 .field-hint {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   line-height: 1.35;
-}
-
-.modal-box input[type="text"] {
-  width: 100%;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.32);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 16px;
-  color: #ffffff;
-  font-family: var(--font-apple);
-  font-size: 14px;
-  outline: none;
-  margin-bottom: 20px;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.modal-box input[type="text"]:focus {
-  border-color: rgba(255, 255, 255, 0.4);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 3px rgba(255, 255, 255, 0.12);
 }
 
 .modal-actions {
@@ -468,32 +456,20 @@ html, body {
   border-radius: 14px;
   font-family: var(--font-apple);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   border: none;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.modal-btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.modal-btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #ffffff;
-}
-
 .modal-btn.primary {
-  background: rgba(255, 255, 255, 0.95);
-  color: #090d12;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  background: #ffffff;
+  color: #0b0f14;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .modal-btn.primary:hover {
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.95);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
 }

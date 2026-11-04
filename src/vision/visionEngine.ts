@@ -46,7 +46,7 @@ export class VisionEngine {
   private fistHoldCounts: number[] = [0, 0];
 
   public mouthThreshold: number = 0.14;
-  public pinchThreshold: number = 0.048;
+  public pinchThreshold: number = 0.040;
 
   async init(onProgress?: (status: string) => void): Promise<void> {
     onProgress?.('Loading Vision WebAssembly...');
@@ -157,22 +157,28 @@ export class VisionEngine {
           }
         }
 
+        // Invariant: The mouth MUST physically separate/open to blow steam.
+        // Closed lips in resting position have verticalOpenness < 0.035.
+        const isMouthOpen = verticalOpenness > 0.040;
+
         // Detection triggers:
         // Case A: Whistle / Small "O" posture (puckered lips with circular opening)
-        const isPuckeredO = (circularity > 0.42 && normalizedMouthWidth < 0.85 && mouthHeight > 0.012) ||
-                            (blendshapePucker > 0.35 || blendshapeFunnel > 0.32);
+        const isPuckeredO = isMouthOpen && (
+          (blendshapePucker > 0.45 || blendshapeFunnel > 0.40) ||
+          (circularity > 0.50 && normalizedMouthWidth < 0.82 && verticalOpenness > 0.048)
+        );
 
-        // Case B: Wide open mouth "HA" posture
-        const isWideOpen = verticalOpenness > 0.16 || blendshapeJawOpen > 0.35;
+        // Case B: Wide open mouth "HA" posture (breathing out warm air onto glass)
+        const isWideOpen = isMouthOpen && (verticalOpenness > 0.14 || blendshapeJawOpen > 0.38);
 
         const isBlowing = isPuckeredO || isWideOpen;
 
-        // Calculate combined intensity
+        // Calculate combined intensity (strictly 0 if mouth is closed)
         let opennessRatio = 0;
         if (isPuckeredO) {
-          opennessRatio = Math.max(blendshapePucker, blendshapeFunnel, Math.min(1, circularity * 0.9));
+          opennessRatio = Math.max(blendshapePucker, blendshapeFunnel, Math.min(1, (verticalOpenness - 0.04) / 0.14));
         } else if (isWideOpen) {
-          opennessRatio = Math.min(1, Math.max(0, (verticalOpenness - 0.08) / 0.18));
+          opennessRatio = Math.min(1, Math.max(0, (verticalOpenness - 0.07) / 0.18));
         }
 
         // Mirrored coordinate so it lines up with mirrored video view
@@ -235,80 +241,96 @@ export class VisionEngine {
           // Knuckle joints
           const indexMcp = landmarks[5];
           const pinkyMcp = landmarks[17];
-          const handScale = Math.hypot(wrist.x - indexMcp.x, wrist.y - indexMcp.y) || 0.1;
 
-          // 1. PINCH DETECTION COMES FIRST (PRIORITY)
-          // When writing, fingers naturally curl into palm while thumb and index pinch.
-          // Pinch MUST take absolute precedence over fist detection!
-          const pinchDist = Math.hypot(
-            indexTip.x - thumbTip.x,
-            indexTip.y - thumbTip.y
-          );
+          // 3D Euclidean distance helper
+          const dist3D = (p1: { x: number; y: number; z?: number }, p2: { x: number; y: number; z?: number }) => {
+            const dx = p1.x - p2.x;
+            const dy = p1.y - p2.y;
+            const dz = (p1.z ?? 0) - (p2.z ?? 0);
+            return Math.sqrt(dx * dx + dy * dy + dz * dz);
+          };
+
+          const handScale = dist3D(wrist, indexMcp) || 0.1;
+
+          // 1. PINCH DETECTION (AIR PENCIL)
+          // Immediate pen-down on contact, immediate pen-up on liftoff to allow writing individual letters
+          const pinchDist = dist3D(indexTip, thumbTip);
 
           const wasPinching = this.prevPinchingState[handIdx] ?? false;
-          const onThreshold = this.pinchThreshold; // default 0.048 for true contact
-          const offThreshold = this.pinchThreshold * 1.45; // 0.070 release hysteresis
+          const onThreshold = this.pinchThreshold; // 0.040 for true fingertip contact
+          const offThreshold = this.pinchThreshold * 1.25; // 0.050: lifts immediately upon finger release
 
           const isPinching = wasPinching
             ? pinchDist < offThreshold
             : pinchDist < onThreshold;
           this.prevPinchingState[handIdx] = isPinching;
 
-          // 2. CLOSED FIST DETECTION (DISAMBIGUATED)
-          // If the user is pinching, it is NEVER a fist eraser!
+          // 2. CLOSED FIST DETECTION (BROAD SQUEEGEE ERASER)
+          // Perspective-invariant 3D geometry:
+          // In a fist, all 4 fingers (index, middle, ring, pinky) are curled tightly into the palm.
+          // We calculate the 3D chord-to-arc ratio: dist3D(tip, mcp) / totalBoneLength.
+          // An open hand pointing at the camera has ratio > 0.80 (straight bones in 3D).
+          // A closed fist has ratio < 0.58 (bones looped back into palm).
           let isFist = false;
           if (isPinching) {
             this.fistHoldCounts[handIdx] = 0;
             this.prevFistState[handIdx] = false;
-          } else if (pinchDist > 0.075) {
-            // Check curl of all 4 fingers
-            const fingersCurledRatios = ([
-              [5, 8],   // index  MCP → tip
-              [9, 12],  // middle MCP → tip
-              [13, 16], // ring   MCP → tip
-              [17, 20], // pinky  MCP → tip
-            ] as [number, number][]).map(([mcpIdx, tipIdx]) => {
+          } else {
+            const fingers3D = [
+              [5, 6, 7, 8],     // index: MCP, PIP, DIP, TIP
+              [9, 10, 11, 12],  // middle
+              [13, 14, 15, 16], // ring
+              [17, 18, 19, 20], // pinky
+            ] as const;
+
+            const curlRatios3D = fingers3D.map(([mcpIdx, pipIdx, dipIdx, tipIdx]) => {
               const mcp = landmarks[mcpIdx];
+              const pip = landmarks[pipIdx];
+              const dip = landmarks[dipIdx];
               const tip = landmarks[tipIdx];
-              const tipToMcp = Math.hypot(tip.x - mcp.x, tip.y - mcp.y);
-              const mcpToWrist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
-              if (mcpToWrist < 0.01) return 1.0;
-              return tipToMcp / mcpToWrist;
+              const boneArc = dist3D(mcp, pip) + dist3D(pip, dip) + dist3D(dip, tip);
+              if (boneArc < 0.01) return 1.0;
+              return dist3D(tip, mcp) / boneArc;
             });
 
-            const nonThumbCurled = fingersCurledRatios.every(r => r < 0.72);
+            // In a closed fist, all 4 fingers are curled tight into the palm
+            const allFingersCurled = curlRatios3D.every(r => r < 0.58);
 
-            // In a real closed fist, the thumb MUST also be folded tight across the knuckles
-            const thumbToMcp = Math.hypot(thumbTip.x - indexMcp.x, thumbTip.y - indexMcp.y);
-            const thumbToWrist = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y);
-            const isThumbCurled = (thumbToMcp < handScale * 0.60) && (thumbToWrist < handScale * 0.88);
+            // In a closed fist, all 4 fingertips are drawn close to the palm/wrist in 3D
+            const tipsNearPalm = [8, 12, 16, 20].every(tipIdx => dist3D(landmarks[tipIdx], wrist) < handScale * 1.35);
 
-            // Ensure hand is fully inside the camera frame (not entering from edge)
-            const isWellInsideFrame = wrist.x > 0.06 && wrist.x < 0.94 && wrist.y > 0.06 && wrist.y < 0.94;
+            // In a fist, thumb is folded against the fingers rather than extended wide
+            const thumbFolded = dist3D(thumbTip, indexMcp) < handScale * 0.90;
 
-            const isCandidateFist = isWellInsideFrame && nonThumbCurled && isThumbCurled;
-            if (isCandidateFist) {
-              this.fistHoldCounts[handIdx]++;
-            } else {
-              this.fistHoldCounts[handIdx] = 0;
-            }
+            // Frame edge gating: hand must be inside camera view (not entering/exiting frame edge)
+            const isFullyInFrame = wrist.x > 0.06 && wrist.x < 0.94 && wrist.y > 0.06 && wrist.y < 0.94;
+
+            const isCandidateFist = isFullyInFrame &&
+                                    allFingersCurled &&
+                                    tipsNearPalm &&
+                                    thumbFolded &&
+                                    pinchDist > 0.050;
 
             // Require 3 consecutive confirmed frames to activate squeegee eraser (prevents frame-entry blips)
+            if (isCandidateFist) {
+              this.fistHoldCounts[handIdx] = Math.min(5, this.fistHoldCounts[handIdx] + 1);
+            } else {
+              this.fistHoldCounts[handIdx] = Math.max(0, this.fistHoldCounts[handIdx] - 1);
+            }
+
             isFist = this.fistHoldCounts[handIdx] >= 3;
             this.prevFistState[handIdx] = isFist;
-          } else {
-            this.fistHoldCounts[handIdx] = 0;
-            this.prevFistState[handIdx] = false;
           }
 
-          // Pointer position: pinch midpoint if pinching, palm center if fist, else index tip for hover
+          // Pointer position:
+          // For air pencil writing, the index fingertip IS the pencil lead.
+          // Keeping coordinate locked to indexTip gives zero jump between hover and drawing,
+          // allowing 100% natural and precise handwriting in air.
           let targetX = indexTip.x;
           let targetY = indexTip.y;
 
-          if (isPinching) {
-            targetX = (indexTip.x + thumbTip.x) * 0.5;
-            targetY = (indexTip.y + thumbTip.y) * 0.5;
-          } else if (isFist) {
+          if (isFist) {
+            // Squeegee eraser centers on knuckle palm pad
             targetX = (indexMcp.x + pinkyMcp.x) * 0.5;
             targetY = (indexMcp.y + pinkyMcp.y) * 0.5;
           }

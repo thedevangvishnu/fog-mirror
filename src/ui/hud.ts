@@ -1,14 +1,12 @@
 /**
  * Refined HUD & Interaction Dock for Fog Mirror
- * Clean, frosted glass minimalist pill interface.
+ * Apple Liquid Glass (visionOS / macOS) translucent white aesthetic.
  */
 
 export interface HUDCallbacks {
   onToggleSound: () => boolean;
   onClearFog: () => void;
   onFullFog: () => void;
-  onUpdateMessage: (msg: string) => void;
-  onToggleMessage: () => boolean;
   onToggleFullscreen: () => void;
   onUpdateWiperWidth: (radius: number) => void;
   onUpdatePinchSensitivity: (threshold: number) => void;
@@ -18,9 +16,7 @@ export class HUD {
   private container: HTMLElement;
   private breathMeter: HTMLElement;
   private statusText: HTMLElement;
-  private secretModal: HTMLElement;
   private settingsModal: HTMLElement;
-  private messageInput: HTMLInputElement;
   private wiperSlider: HTMLInputElement;
   private wiperValueLabel: HTMLElement;
   private pinchSlider: HTMLInputElement;
@@ -30,6 +26,8 @@ export class HUD {
 
   constructor(callbacks: HUDCallbacks) {
     this.callbacks = callbacks;
+
+    // 1. Bottom Control Dock
     this.container = document.createElement('div');
     this.container.className = 'hud-container';
 
@@ -46,13 +44,15 @@ export class HUD {
 
         <div class="hud-divider"></div>
 
-        <div class="hud-slider-group" title="Wiper Brush Width">
+        <div class="hud-slider-group" title="Air Pencil Width">
           <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <circle cx="12" cy="12" r="8" stroke-dasharray="2 2"></circle>
+            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+            <path d="M2 2l7.586 7.586"></path>
+            <circle cx="11" cy="11" r="2"></circle>
           </svg>
-          <input type="range" id="slider-wiper" min="4" max="40" value="8" class="hud-slider" />
-          <span class="slider-badge" id="val-wiper">8px</span>
+          <input type="range" id="slider-wiper" min="3" max="30" value="6" class="hud-slider" />
+          <span class="slider-badge" id="val-wiper">6px</span>
         </div>
 
         <div class="hud-divider"></div>
@@ -64,16 +64,10 @@ export class HUD {
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-settings" title="Adjust Pinch & Gestures">
+        <button class="hud-btn" id="btn-settings" title="Adjust Air Pencil Sensitivity">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-
-        <button class="hud-btn" id="btn-secret" title="Secret Steam Message">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
           </svg>
         </button>
 
@@ -97,54 +91,39 @@ export class HUD {
       </div>
 
       <div class="hud-help-tip">
-        <span><b>Pinch fingers</b> or <b>make a fist</b> to wipe &bull; Press <b>H</b> to hide UI for clean video recording</span>
-      </div>
-
-      <!-- Settings Modal (Pinch Sensitivity) -->
-      <div class="secret-modal hidden" id="settings-modal">
-        <div class="modal-box">
-          <div class="modal-header">
-            <h3>Interaction Settings</h3>
-            <button class="modal-close" id="settings-close">&times;</button>
-          </div>
-          <p class="modal-desc">Fine-tune hand tracking and gesture sensitivity.</p>
-          
-          <div class="modal-field">
-            <label>Pinch Trigger Distance: <b id="val-pinch">0.048</b></label>
-            <input type="range" id="slider-pinch" min="0.025" max="0.080" step="0.002" value="0.048" class="modal-slider" />
-            <span class="field-hint">Distance threshold to start writing. Built-in hysteresis maintains clean, unbroken pencil strokes until fingers open.</span>
-          </div>
-
-          <div class="modal-actions">
-            <button class="modal-btn primary" id="settings-done">Done</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Secret Message Modal -->
-      <div class="secret-modal hidden" id="secret-modal">
-        <div class="modal-box">
-          <div class="modal-header">
-            <h3>Subconscious Steam Message</h3>
-            <button class="modal-close" id="modal-close">&times;</button>
-          </div>
-          <p class="modal-desc">This text appears faintly inside the condensation when the glass steams up.</p>
-          <input type="text" id="message-input" value="clarity is an inner state" placeholder="Write your hidden reflection..." />
-          <div class="modal-actions">
-            <button class="modal-btn secondary" id="modal-toggle-msg">Toggle Visible</button>
-            <button class="modal-btn primary" id="modal-save-msg">Save</button>
-          </div>
-        </div>
+        <span><b>Pinch fingers</b> to write &bull; <b>Closed fist</b> to squeegee erase &bull; Press <b>H</b> to hide controls</span>
       </div>
     `;
 
     document.body.appendChild(this.container);
 
+    // 2. Modals attached directly to body (avoiding CSS transform containing block bug)
+    this.settingsModal = document.createElement('div');
+    this.settingsModal.className = 'secret-modal hidden';
+    this.settingsModal.id = 'settings-modal';
+    this.settingsModal.innerHTML = `
+      <div class="modal-box">
+        <div class="modal-header">
+          <h3>Interaction Settings</h3>
+          <button class="modal-close" id="settings-close">&times;</button>
+        </div>
+        <p class="modal-desc">Fine-tune air pencil writing sensitivity.</p>
+        
+        <div class="modal-field">
+          <label>Pinch Writing Sensitivity: <b id="val-pinch">0.040</b></label>
+          <input type="range" id="slider-pinch" min="0.025" max="0.070" step="0.002" value="0.040" class="modal-slider" />
+          <span class="field-hint">Touch fingers together to write. Release to instantly lift pencil and write the next letter.</span>
+        </div>
+
+        <div class="modal-actions">
+          <button class="modal-btn primary" id="settings-done">Done</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(this.settingsModal);
+
     this.breathMeter = document.getElementById('breath-meter')!;
     this.statusText = document.getElementById('hud-status')!;
-    this.secretModal = document.getElementById('secret-modal')!;
-    this.settingsModal = document.getElementById('settings-modal')!;
-    this.messageInput = document.getElementById('message-input') as HTMLInputElement;
     this.wiperSlider = document.getElementById('slider-wiper') as HTMLInputElement;
     this.wiperValueLabel = document.getElementById('val-wiper')!;
     this.pinchSlider = document.getElementById('slider-pinch') as HTMLInputElement;
@@ -155,14 +134,10 @@ export class HUD {
 
   private bindEvents(): void {
     const btnSound = document.getElementById('btn-sound')!;
-    const btnSecret = document.getElementById('btn-secret')!;
     const btnSettings = document.getElementById('btn-settings')!;
     const btnFog = document.getElementById('btn-fog')!;
     const btnClear = document.getElementById('btn-clear')!;
     const btnFullscreen = document.getElementById('btn-fullscreen')!;
-    const modalClose = document.getElementById('modal-close')!;
-    const modalSave = document.getElementById('modal-save-msg')!;
-    const modalToggle = document.getElementById('modal-toggle-msg')!;
     const settingsClose = document.getElementById('settings-close')!;
     const settingsDone = document.getElementById('settings-done')!;
 
@@ -176,7 +151,7 @@ export class HUD {
     // Pinch sensitivity slider
     this.pinchSlider.addEventListener('input', () => {
       const val = parseFloat(this.pinchSlider.value);
-      this.pinchValueLabel.textContent = val.toFixed(2);
+      this.pinchValueLabel.textContent = val.toFixed(3);
       this.callbacks.onUpdatePinchSensitivity(val);
     });
 
@@ -184,11 +159,6 @@ export class HUD {
       const isMuted = this.callbacks.onToggleSound();
       btnSound.classList.toggle('active', !isMuted);
       btnSound.title = isMuted ? 'Unmute ASMR Sound (M)' : 'Mute ASMR Sound (M)';
-    });
-
-    btnSecret.addEventListener('click', () => {
-      this.secretModal.classList.remove('hidden');
-      this.messageInput.focus();
     });
 
     btnSettings.addEventListener('click', () => {
@@ -203,28 +173,12 @@ export class HUD {
       this.settingsModal.classList.add('hidden');
     });
 
-    modalClose.addEventListener('click', () => {
-      this.secretModal.classList.add('hidden');
-    });
-
-    modalSave.addEventListener('click', () => {
-      this.callbacks.onUpdateMessage(this.messageInput.value);
-      this.secretModal.classList.add('hidden');
-    });
-
-    modalToggle.addEventListener('click', () => {
-      const shown = this.callbacks.onToggleMessage();
-      modalToggle.textContent = shown ? 'Disable Message' : 'Enable Message';
-    });
-
     btnFog.addEventListener('click', () => this.callbacks.onFullFog());
     btnClear.addEventListener('click', () => this.callbacks.onClearFog());
     btnFullscreen.addEventListener('click', () => this.callbacks.onToggleFullscreen());
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
-      if (document.activeElement === this.messageInput) return;
-
       if (e.key === 'h' || e.key === 'H') {
         this.toggleVisibility();
       } else if (e.key === 'm' || e.key === 'M') {

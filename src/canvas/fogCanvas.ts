@@ -29,9 +29,9 @@ export class FogCanvas {
 
   // Simulation physics
   public evaporationRate: number = 0.0006; // Slow natural drying
-  public wipeBrushRadius: number = 8; // Default crisp pencil writing radius
-  public secretMessage: string = "clarity is an inner state";
-  public showSecretMessage: boolean = true;
+  public wipeBrushRadius: number = 6; // Default crisp air-pencil writing radius
+  public secretMessage: string = "";
+  public showSecretMessage: boolean = false; // Disabled completely as requested
 
   // Droplet particle physics
   private droplets: Droplet[] = [];
@@ -50,7 +50,7 @@ export class FogCanvas {
 
     this.resize();
     this.createNoisePattern();
-    this.initInitialFog(0.45); // Start with an inviting light steam
+    this.initInitialFog(0.24); // Mild translucent atmospheric mist: background stays clearly visible
   }
 
   resize(): void {
@@ -89,14 +89,14 @@ export class FogCanvas {
     this.noisePattern = this.offscreenCtx.createPattern(patternCanvas, 'repeat');
   }
 
-  initInitialFog(density: number = 0.5): void {
+  initInitialFog(density: number = 0.24): void {
     this.offscreenCtx.clearRect(0, 0, this.width, this.height);
     this.offscreenCtx.fillStyle = 'rgba(235, 242, 250, ' + density + ')';
     this.offscreenCtx.fillRect(0, 0, this.width, this.height);
 
     if (this.noisePattern) {
       this.offscreenCtx.fillStyle = this.noisePattern;
-      this.offscreenCtx.globalAlpha = density * 0.7;
+      this.offscreenCtx.globalAlpha = density * 0.4;
       this.offscreenCtx.fillRect(0, 0, this.width, this.height);
       this.offscreenCtx.globalAlpha = 1.0;
     }
@@ -161,8 +161,8 @@ export class FogCanvas {
     }
 
     const currentRadius = isFist
-      ? Math.max(52, this.wipeBrushRadius * 3.5)
-      : this.wipeBrushRadius;
+      ? 55
+      : Math.max(3, this.wipeBrushRadius);
 
     const lastPos = this.lastWipePositions.get(pointerId);
     if (!lastPos) {
@@ -171,11 +171,11 @@ export class FogCanvas {
       this.offscreenCtx.save();
       this.offscreenCtx.globalCompositeOperation = 'destination-out';
       const grad = this.offscreenCtx.createRadialGradient(
-        x, y, currentRadius * 0.15,
+        x, y, currentRadius * 0.1,
         x, y, currentRadius
       );
       grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-      grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.95)');
+      grad.addColorStop(0.92, 'rgba(0, 0, 0, 1)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       this.offscreenCtx.fillStyle = grad;
       this.offscreenCtx.beginPath();
@@ -190,7 +190,7 @@ export class FogCanvas {
     const dist = Math.hypot(dx, dy);
 
     // Movement gating: prevent continuous erosion while held completely still
-    if (dist < 1.5) {
+    if (dist < 1.0) {
       return;
     }
 
@@ -200,7 +200,7 @@ export class FogCanvas {
     this.offscreenCtx.globalCompositeOperation = 'destination-out';
 
     // Interpolate steps along stroke to guarantee continuous connected line
-    const stepSize = Math.max(2, currentRadius * 0.4);
+    const stepSize = Math.max(1.5, currentRadius * 0.35);
     const steps = Math.max(1, Math.ceil(dist / stepSize));
     for (let i = 0; i <= steps; i++) {
       const curX = lastPos.x + (dx * i) / steps;
@@ -209,13 +209,13 @@ export class FogCanvas {
       const grad = this.offscreenCtx.createRadialGradient(
         curX,
         curY,
-        currentRadius * 0.15,
+        currentRadius * 0.1,
         curX,
         curY,
         currentRadius
       );
       grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-      grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.95)');
+      grad.addColorStop(0.92, 'rgba(0, 0, 0, 1)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
       this.offscreenCtx.fillStyle = grad;
@@ -251,12 +251,7 @@ export class FogCanvas {
     // 3. Clear main display canvas
     this.ctx.clearRect(0, 0, this.width, this.height);
 
-    // 4. Render the Secret Steam Message behind/inside the fog layer
-    if (this.showSecretMessage && this.secretMessage) {
-      this.renderSecretMessage();
-    }
-
-    // 5. Blit offscreen fog mask onto main canvas with soft frosted overlay
+    // 4. Blit offscreen fog mask onto main canvas with soft frosted overlay
     this.ctx.drawImage(this.offscreenCanvas, 0, 0);
   }
 
@@ -299,21 +294,7 @@ export class FogCanvas {
     this.offscreenCtx.restore();
   }
 
-  private renderSecretMessage(): void {
-    this.ctx.save();
-    this.ctx.font = '300 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.letterSpacing = '4px';
 
-    // Soft glow
-    this.ctx.shadowColor = 'rgba(255, 255, 255, 0.45)';
-    this.ctx.shadowBlur = 12;
-
-    this.ctx.fillText(this.secretMessage, this.width * 0.5, this.height * 0.38);
-    this.ctx.restore();
-  }
 
   clearAllFog(): void {
     this.offscreenCtx.clearRect(0, 0, this.width, this.height);
