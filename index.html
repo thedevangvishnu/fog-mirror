@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fog Mirror — Steamy Glass & Breath Interaction</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Mirrored Webcam Video Feed -->
+      <video id="webcam" class="mirror-video" playsinline autoplay muted></video>
+
+      <!-- Condensation and Wiping Canvas -->
+      <canvas id="fog-canvas" class="fog-canvas"></canvas>
+
+      <!-- Glass Vignette & Reflection Glare -->
+      <div class="glass-glare"></div>
+
+      <!-- Fingertip Spatial Tracker Reticles -->
+      <div id="finger-0" class="finger-cursor"></div>
+      <div id="finger-1" class="finger-cursor"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
