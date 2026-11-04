@@ -135,17 +135,6 @@ export class FogCanvas {
     this.offscreenCtx.arc(screenX, screenY - 20, plumeRadius, 0, Math.PI * 2);
     this.offscreenCtx.fill();
 
-    // Occasional condensation droplet spawn in thick steam regions
-    if (Math.random() < 0.08 * intensity && this.droplets.length < 24) {
-      this.droplets.push({
-        x: screenX + (Math.random() - 0.5) * plumeRadius * 0.8,
-        y: screenY + (Math.random() - 0.5) * plumeRadius * 0.5,
-        radius: 2 + Math.random() * 2.5,
-        speed: 0.6 + Math.random() * 1.4,
-        trail: []
-      });
-    }
-
     this.offscreenCtx.restore();
   }
 
