@@ -4,7 +4,7 @@
  */
 
 import './style.css';
-import { VisionEngine } from './vision/visionEngine';
+import { VisionEngine, type HandPointer } from './vision/visionEngine';
 import { AudioEngine } from './audio/audioEngine';
 import { FogCanvas } from './canvas/fogCanvas';
 import { HUD } from './ui/hud';
@@ -119,8 +119,11 @@ class FogMirrorApp {
     let mouthBlow = 0;
     let mouthCenter = { x: 0.5, y: 0.65 };
 
-    if (this.vision.ready && this.video.readyState >= 2) {
-      const { breath, pointers } = this.vision.processFrame(this.video);
+    const sample = this.vision.ready && this.video.readyState >= 2
+      ? this.vision.processFrame(this.video)
+      : null;
+    if (sample) {
+      const { breath, pointers } = sample;
 
       if (breath.isBlowing) {
         mouthBlow = breath.opennessRatio;
@@ -132,6 +135,8 @@ class FogMirrorApp {
 
       // Process Hand Pointers for wiping
       this.handleVisionPointers(pointers);
+    } else if (this.video.readyState < 2) {
+      this.handleVisionPointers([]);
     }
 
     // 3. Combine Vision + Mic + Spacebar manual blow
@@ -207,10 +212,10 @@ class FogMirrorApp {
     };
   }
 
-  private handleVisionPointers(pointers: { x: number; y: number; isPinching: boolean; isFist: boolean }[]): void {
+  private handleVisionPointers(pointers: HandPointer[]): void {
     for (let i = 0; i < this.fingerCursors.length; i++) {
       const cursor = this.fingerCursors[i];
-      const pointer = pointers[i];
+      const pointer = pointers.find(pointer => pointer.slot === i);
 
       if (pointer) {
         const mapped = this.mapVideoToScreen(pointer.x, pointer.y);
@@ -222,6 +227,9 @@ class FogMirrorApp {
         const isWiping = pointer.isPinching || pointer.isFist;
         cursor.classList.toggle('pinching', pointer.isPinching);
         cursor.classList.toggle('fist', pointer.isFist);
+        if (pointer.isFist) {
+          cursor.style.setProperty('--fist-diameter', `${this.fog.fistRadius * 2}px`);
+        }
         cursor.classList.toggle('wiping', isWiping);
 
         // Wipe fog only when an intentional gesture is active, passing isFist for squeegee scaling

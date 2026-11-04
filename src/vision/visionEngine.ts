@@ -1,6 +1,6 @@
 /**
  * Vision Engine for Fog Mirror
- * Powered by MediaPipe Tasks Vision (FaceLandmarker + HandLandmarker)
+ * Powered by MediaPipe Tasks Vision (FaceLandmarker + GestureRecognizer)
  * Extracts:
  * 1. Normalized mouth openness ratio (for breath condensation)
  * 2. Mirrored 2D coordinates for mouth center
@@ -10,7 +10,7 @@
 import {
   FilesetResolver,
   FaceLandmarker,
-  HandLandmarker
+  GestureRecognizer
 } from '@mediapipe/tasks-vision';
 import { OneEuroFilter } from './oneEuroFilter';
 
@@ -25,7 +25,7 @@ export interface HandPointer {
   y: number;
   isPinching: boolean;
   isFist: boolean;
-  pinchDistance: number;
+  slot: number;
 }
 
 interface LandmarkFilterPair {
@@ -35,15 +35,16 @@ interface LandmarkFilterPair {
 
 export class VisionEngine {
   private faceLandmarker: FaceLandmarker | null = null;
-  private handLandmarker: HandLandmarker | null = null;
+  private gestureRecognizer: GestureRecognizer | null = null;
   private isReady: boolean = false;
   private lastVideoTime: number = -1;
 
-  // Smoothing filters: 21 landmarks per hand, 2 hands
-  private handFilters: LandmarkFilterPair[][] = [];
-  private prevPinchingState: boolean[] = [false, false];
-  private prevFistState: boolean[] = [false, false];
-  private fistHoldCounts: number[] = [0, 0];
+  private pointerFilters: LandmarkFilterPair[] = Array.from({ length: 2 }, () => ({
+    x: new OneEuroFilter(60, 7, 2),
+    y: new OneEuroFilter(60, 7, 2)
+  }));
+  private tools: ('hover' | 'pencil' | 'fist')[] = ['hover', 'hover'];
+  private fistSamples = [0, 0];
 
   public mouthThreshold: number = 0.14;
   public pinchThreshold: number = 0.040;
@@ -66,10 +67,10 @@ export class VisionEngine {
       minTrackingConfidence: 0.5
     });
 
-    onProgress?.('Initializing Hand Landmarker...');
-    this.handLandmarker = await HandLandmarker.createFromOptions(vision, {
+    onProgress?.('Initializing Hand Gesture Recognizer...');
+    this.gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
       baseOptions: {
-        modelAssetPath: '/models/hand_landmarker.task',
+        modelAssetPath: '/models/gesture_recognizer.task',
         delegate: 'GPU'
       },
       runningMode: 'VIDEO',
@@ -93,8 +94,8 @@ export class VisionEngine {
   processFrame(video: HTMLVideoElement): {
     breath: BreathDetectionResult;
     pointers: HandPointer[];
-  } {
-    if (!this.isReady || !this.faceLandmarker || !this.handLandmarker) {
+  } | null {
+    if (!this.isReady || !this.faceLandmarker || !this.gestureRecognizer) {
       return {
         breath: { isBlowing: false, opennessRatio: 0, mouthCenter: null },
         pointers: []
@@ -102,10 +103,7 @@ export class VisionEngine {
     }
 
     if (video.currentTime === this.lastVideoTime) {
-      return {
-        breath: { isBlowing: false, opennessRatio: 0, mouthCenter: null },
-        pointers: []
-      };
+      return null;
     }
     this.lastVideoTime = video.currentTime;
     const nowMs = performance.now();
@@ -195,157 +193,73 @@ export class VisionEngine {
       // Frame skip protection
     }
 
-    // 2. Hand landmarks for intentional wiping (Pinch or Fist)
     const pointers: HandPointer[] = [];
     try {
-      const handResults = this.handLandmarker.detectForVideo(video, nowMs);
-      const detectedCount = handResults.landmarks ? handResults.landmarks.length : 0;
+      const results = this.gestureRecognizer.recognizeForVideo(video, nowMs);
+      const aspect = video.videoWidth / video.videoHeight || 1;
 
-      // Reset filters for lost hands
-      for (let h = detectedCount; h < this.handFilters.length; h++) {
-        if (this.handFilters[h]) {
-          this.handFilters[h].forEach(f => {
-            f.x.reset();
-            f.y.reset();
-          });
+      for (const [index, landmarks] of results.landmarks.entries()) {
+        const handedness = results.handedness[index]?.[0]?.categoryName;
+        if (handedness !== 'Left' && handedness !== 'Right') continue;
+        const slot = handedness === 'Left' ? 0 : 1;
+        if (pointers.some(pointer => pointer.slot === slot)) continue;
+
+        const wrist = landmarks[0];
+        const thumbTip = landmarks[4];
+        const indexBase = landmarks[5];
+        const indexTip = landmarks[8];
+        const middleBase = landmarks[9];
+        const pinkyBase = landmarks[17];
+
+        // Compare distances in the same image units and normalize by palm size.
+        const palmLength = Math.hypot((middleBase.x - wrist.x) * aspect, middleBase.y - wrist.y);
+        const palmWidth = Math.hypot((pinkyBase.x - indexBase.x) * aspect, pinkyBase.y - indexBase.y);
+        const palmScale = Math.max(palmLength, palmWidth, 0.025);
+        const pinchGap = Math.hypot((indexTip.x - thumbTip.x) * aspect, indexTip.y - thumbTip.y) / palmScale;
+        const inFrame = landmarks.every(point =>
+          point.x > 0.01 && point.x < 0.99 && point.y > 0.01 && point.y < 0.99
+        );
+
+        const previousTool = this.tools[slot];
+        const gesture = results.gestures[index]?.[0];
+        const fistScore = gesture?.categoryName === 'Closed_Fist' ? gesture.score : 0;
+        const openPalm = gesture?.categoryName === 'Open_Palm' && gesture.score >= 0.7;
+        const fistCandidate = inFrame && fistScore >= (previousTool === 'fist' ? 0.45 : 0.7);
+        this.fistSamples[slot] = fistCandidate ? Math.min(this.fistSamples[slot] + 1, 2) : 0;
+
+        const isFist = this.fistSamples[slot] >= 2;
+        const contactThreshold = this.pinchThreshold * 5;
+        const isPinching = inFrame && !fistCandidate && !openPalm &&
+          pinchGap < contactThreshold * (previousTool === 'pencil' ? 1.25 : 1);
+        const tool = isFist ? 'fist' : isPinching ? 'pencil' : 'hover';
+
+        const filters = this.pointerFilters[slot];
+        if ((previousTool === 'fist') !== isFist) {
+          filters.x.reset();
+          filters.y.reset();
         }
-        this.prevPinchingState[h] = false;
-        this.prevFistState[h] = false;
-      }
+        this.tools[slot] = tool;
 
-      if (detectedCount > 0 && handResults.landmarks) {
-        for (let handIdx = 0; handIdx < handResults.landmarks.length; handIdx++) {
-          const rawLandmarks = handResults.landmarks[handIdx];
-
-          // Initialize OneEuroFilter bank for this hand if needed
-          // Tuned: minCutOff=1.2 (zero jitter when still), beta=0.5 (high-speed pencil responsiveness, zero lag)
-          if (!this.handFilters[handIdx]) {
-            this.handFilters[handIdx] = Array.from({ length: 21 }, () => ({
-              x: new OneEuroFilter(60, 1.2, 0.5),
-              y: new OneEuroFilter(60, 1.2, 0.5)
-            }));
-          }
-
-          // Smooth each landmark coordinate
-          const filters = this.handFilters[handIdx];
-          const landmarks = rawLandmarks.map((pt, i) => ({
-            x: filters[i].x.filter(pt.x, nowMs),
-            y: filters[i].y.filter(pt.y, nowMs),
-            z: pt.z
-          }));
-
-          const wrist = landmarks[0];
-          const thumbTip = landmarks[4];
-          const indexTip = landmarks[8];
-
-          // Knuckle joints
-          const indexMcp = landmarks[5];
-          const pinkyMcp = landmarks[17];
-
-          // 3D Euclidean distance helper
-          const dist3D = (p1: { x: number; y: number; z?: number }, p2: { x: number; y: number; z?: number }) => {
-            const dx = p1.x - p2.x;
-            const dy = p1.y - p2.y;
-            const dz = (p1.z ?? 0) - (p2.z ?? 0);
-            return Math.sqrt(dx * dx + dy * dy + dz * dz);
-          };
-
-          const handScale = dist3D(wrist, indexMcp) || 0.1;
-
-          // 1. PINCH DETECTION (AIR PENCIL)
-          // Immediate pen-down on contact, immediate pen-up on liftoff to allow writing individual letters
-          const pinchDist = dist3D(indexTip, thumbTip);
-
-          const wasPinching = this.prevPinchingState[handIdx] ?? false;
-          const onThreshold = this.pinchThreshold; // 0.040 for true fingertip contact
-          const offThreshold = this.pinchThreshold * 1.25; // 0.050: lifts immediately upon finger release
-
-          const isPinching = wasPinching
-            ? pinchDist < offThreshold
-            : pinchDist < onThreshold;
-          this.prevPinchingState[handIdx] = isPinching;
-
-          // 2. CLOSED FIST DETECTION (BROAD SQUEEGEE ERASER)
-          // Perspective-invariant 3D geometry:
-          // In a fist, all 4 fingers (index, middle, ring, pinky) are curled tightly into the palm.
-          // We calculate the 3D chord-to-arc ratio: dist3D(tip, mcp) / totalBoneLength.
-          // An open hand pointing at the camera has ratio > 0.80 (straight bones in 3D).
-          // A closed fist has ratio < 0.58 (bones looped back into palm).
-          let isFist = false;
-          if (isPinching) {
-            this.fistHoldCounts[handIdx] = 0;
-            this.prevFistState[handIdx] = false;
-          } else {
-            const fingers3D = [
-              [5, 6, 7, 8],     // index: MCP, PIP, DIP, TIP
-              [9, 10, 11, 12],  // middle
-              [13, 14, 15, 16], // ring
-              [17, 18, 19, 20], // pinky
-            ] as const;
-
-            const curlRatios3D = fingers3D.map(([mcpIdx, pipIdx, dipIdx, tipIdx]) => {
-              const mcp = landmarks[mcpIdx];
-              const pip = landmarks[pipIdx];
-              const dip = landmarks[dipIdx];
-              const tip = landmarks[tipIdx];
-              const boneArc = dist3D(mcp, pip) + dist3D(pip, dip) + dist3D(dip, tip);
-              if (boneArc < 0.01) return 1.0;
-              return dist3D(tip, mcp) / boneArc;
-            });
-
-            // In a closed fist, all 4 fingers are curled tight into the palm
-            const allFingersCurled = curlRatios3D.every(r => r < 0.58);
-
-            // In a closed fist, all 4 fingertips are drawn close to the palm/wrist in 3D
-            const tipsNearPalm = [8, 12, 16, 20].every(tipIdx => dist3D(landmarks[tipIdx], wrist) < handScale * 1.35);
-
-            // In a fist, thumb is folded against the fingers rather than extended wide
-            const thumbFolded = dist3D(thumbTip, indexMcp) < handScale * 0.90;
-
-            // Frame edge gating: hand must be inside camera view (not entering/exiting frame edge)
-            const isFullyInFrame = wrist.x > 0.06 && wrist.x < 0.94 && wrist.y > 0.06 && wrist.y < 0.94;
-
-            const isCandidateFist = isFullyInFrame &&
-                                    allFingersCurled &&
-                                    tipsNearPalm &&
-                                    thumbFolded &&
-                                    pinchDist > 0.050;
-
-            // Require 3 consecutive confirmed frames to activate squeegee eraser (prevents frame-entry blips)
-            if (isCandidateFist) {
-              this.fistHoldCounts[handIdx] = Math.min(5, this.fistHoldCounts[handIdx] + 1);
-            } else {
-              this.fistHoldCounts[handIdx] = Math.max(0, this.fistHoldCounts[handIdx] - 1);
-            }
-
-            isFist = this.fistHoldCounts[handIdx] >= 3;
-            this.prevFistState[handIdx] = isFist;
-          }
-
-          // Pointer position:
-          // For air pencil writing, the index fingertip IS the pencil lead.
-          // Keeping coordinate locked to indexTip gives zero jump between hover and drawing,
-          // allowing 100% natural and precise handwriting in air.
-          let targetX = indexTip.x;
-          let targetY = indexTip.y;
-
-          if (isFist) {
-            // Squeegee eraser centers on knuckle palm pad
-            targetX = (indexMcp.x + pinkyMcp.x) * 0.5;
-            targetY = (indexMcp.y + pinkyMcp.y) * 0.5;
-          }
-
-          pointers.push({
-            x: 1 - targetX, // Mirrored
-            y: targetY,
-            isPinching,
-            isFist,
-            pinchDistance: pinchDist
-          });
-        }
+        const x = isFist ? (wrist.x + middleBase.x) / 2 : indexTip.x;
+        const y = isFist ? (wrist.y + middleBase.y) / 2 : indexTip.y;
+        pointers.push({
+          slot,
+          x: 1 - filters.x.filter(x, nowMs),
+          y: filters.y.filter(y, nowMs),
+          isPinching,
+          isFist
+        });
       }
     } catch {
-      // Frame skip protection
+      pointers.length = 0;
+    }
+
+    for (const [slot, filters] of this.pointerFilters.entries()) {
+      if (pointers.some(pointer => pointer.slot === slot)) continue;
+      filters.x.reset();
+      filters.y.reset();
+      this.tools[slot] = 'hover';
+      this.fistSamples[slot] = 0;
     }
 
     return { breath, pointers };
