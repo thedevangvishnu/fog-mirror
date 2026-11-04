@@ -10,6 +10,8 @@ export interface HUDCallbacks {
   onUpdateMessage: (msg: string) => void;
   onToggleMessage: () => boolean;
   onToggleFullscreen: () => void;
+  onUpdateWiperWidth: (radius: number) => void;
+  onUpdatePinchSensitivity: (threshold: number) => void;
 }
 
 export class HUD {
@@ -17,7 +19,12 @@ export class HUD {
   private breathMeter: HTMLElement;
   private statusText: HTMLElement;
   private secretModal: HTMLElement;
+  private settingsModal: HTMLElement;
   private messageInput: HTMLInputElement;
+  private wiperSlider: HTMLInputElement;
+  private wiperValueLabel: HTMLElement;
+  private pinchSlider: HTMLInputElement;
+  private pinchValueLabel: HTMLElement;
   private callbacks: HUDCallbacks;
   private isVisible: boolean = true;
 
@@ -39,10 +46,28 @@ export class HUD {
 
         <div class="hud-divider"></div>
 
+        <div class="hud-slider-group" title="Wiper Brush Width">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <circle cx="12" cy="12" r="8" stroke-dasharray="2 2"></circle>
+          </svg>
+          <input type="range" id="slider-wiper" min="8" max="60" value="20" class="hud-slider" />
+          <span class="slider-badge" id="val-wiper">20px</span>
+        </div>
+
+        <div class="hud-divider"></div>
+
         <button class="hud-btn" id="btn-sound" title="Toggle ASMR Sound (M)">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.08"></path>
+          </svg>
+        </button>
+
+        <button class="hud-btn" id="btn-settings" title="Adjust Pinch & Gestures">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </button>
 
@@ -72,7 +97,28 @@ export class HUD {
       </div>
 
       <div class="hud-help-tip">
-        <span>Press <b>H</b> to hide UI for clean video recording &bull; <b>Space</b> to blow steam</span>
+        <span><b>Pinch fingers</b> or <b>make a fist</b> to wipe &bull; Press <b>H</b> to hide UI for clean video recording</span>
+      </div>
+
+      <!-- Settings Modal (Pinch Sensitivity) -->
+      <div class="secret-modal hidden" id="settings-modal">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h3>Interaction Settings</h3>
+            <button class="modal-close" id="settings-close">&times;</button>
+          </div>
+          <p class="modal-desc">Fine-tune hand tracking and gesture sensitivity.</p>
+          
+          <div class="modal-field">
+            <label>Pinch Trigger Distance: <b id="val-pinch">0.07</b></label>
+            <input type="range" id="slider-pinch" min="0.04" max="0.14" step="0.01" value="0.07" class="modal-slider" />
+            <span class="field-hint">Higher values make pinching easier; lower values require closer finger contact.</span>
+          </div>
+
+          <div class="modal-actions">
+            <button class="modal-btn primary" id="settings-done">Done</button>
+          </div>
+        </div>
       </div>
 
       <!-- Secret Message Modal -->
@@ -97,7 +143,12 @@ export class HUD {
     this.breathMeter = document.getElementById('breath-meter')!;
     this.statusText = document.getElementById('hud-status')!;
     this.secretModal = document.getElementById('secret-modal')!;
+    this.settingsModal = document.getElementById('settings-modal')!;
     this.messageInput = document.getElementById('message-input') as HTMLInputElement;
+    this.wiperSlider = document.getElementById('slider-wiper') as HTMLInputElement;
+    this.wiperValueLabel = document.getElementById('val-wiper')!;
+    this.pinchSlider = document.getElementById('slider-pinch') as HTMLInputElement;
+    this.pinchValueLabel = document.getElementById('val-pinch')!;
 
     this.bindEvents();
   }
@@ -105,12 +156,29 @@ export class HUD {
   private bindEvents(): void {
     const btnSound = document.getElementById('btn-sound')!;
     const btnSecret = document.getElementById('btn-secret')!;
+    const btnSettings = document.getElementById('btn-settings')!;
     const btnFog = document.getElementById('btn-fog')!;
     const btnClear = document.getElementById('btn-clear')!;
     const btnFullscreen = document.getElementById('btn-fullscreen')!;
     const modalClose = document.getElementById('modal-close')!;
     const modalSave = document.getElementById('modal-save-msg')!;
     const modalToggle = document.getElementById('modal-toggle-msg')!;
+    const settingsClose = document.getElementById('settings-close')!;
+    const settingsDone = document.getElementById('settings-done')!;
+
+    // Wiper width slider
+    this.wiperSlider.addEventListener('input', () => {
+      const val = parseInt(this.wiperSlider.value, 10);
+      this.wiperValueLabel.textContent = `${val}px`;
+      this.callbacks.onUpdateWiperWidth(val);
+    });
+
+    // Pinch sensitivity slider
+    this.pinchSlider.addEventListener('input', () => {
+      const val = parseFloat(this.pinchSlider.value);
+      this.pinchValueLabel.textContent = val.toFixed(2);
+      this.callbacks.onUpdatePinchSensitivity(val);
+    });
 
     btnSound.addEventListener('click', () => {
       const isMuted = this.callbacks.onToggleSound();
@@ -121,6 +189,18 @@ export class HUD {
     btnSecret.addEventListener('click', () => {
       this.secretModal.classList.remove('hidden');
       this.messageInput.focus();
+    });
+
+    btnSettings.addEventListener('click', () => {
+      this.settingsModal.classList.remove('hidden');
+    });
+
+    settingsClose.addEventListener('click', () => {
+      this.settingsModal.classList.add('hidden');
+    });
+
+    settingsDone.addEventListener('click', () => {
+      this.settingsModal.classList.add('hidden');
     });
 
     modalClose.addEventListener('click', () => {

@@ -52,6 +52,12 @@ class FogMirrorApp {
         } else {
           document.exitFullscreen();
         }
+      },
+      onUpdateWiperWidth: (radius: number) => {
+        this.fog.setBrushRadius(radius);
+      },
+      onUpdatePinchSensitivity: (threshold: number) => {
+        this.vision.pinchThreshold = threshold;
       }
     });
 

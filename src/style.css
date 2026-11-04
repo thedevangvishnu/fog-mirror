@@ -175,6 +175,74 @@ html, body {
   background: rgba(255, 255, 255, 0.15);
 }
 
+.hud-slider-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.hud-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 74px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+
+.hud-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #38bdf8;
+  cursor: pointer;
+  box-shadow: 0 0 6px rgba(56, 189, 248, 0.6);
+  transition: transform 0.1s ease;
+}
+
+.hud-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+}
+
+.slider-badge {
+  font-size: 11px;
+  font-weight: 500;
+  color: #94a3b8;
+  min-width: 28px;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.modal-field label {
+  font-size: 13px;
+  color: #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+}
+
+.modal-slider {
+  width: 100%;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+.field-hint {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.3;
+}
+
 .hud-btn {
   display: flex;
   align-items: center;

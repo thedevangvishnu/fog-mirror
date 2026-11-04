@@ -29,7 +29,7 @@ export class FogCanvas {
 
   // Simulation physics
   public evaporationRate: number = 0.0006; // Slow natural drying
-  public wipeBrushRadius: number = 38;
+  public wipeBrushRadius: number = 20; // Default refined brush radius
   public secretMessage: string = "clarity is an inner state";
   public showSecretMessage: boolean = true;
 
@@ -136,6 +136,13 @@ export class FogCanvas {
     this.offscreenCtx.fill();
 
     this.offscreenCtx.restore();
+  }
+
+  /**
+   * Set wiper brush radius
+   */
+  setBrushRadius(radius: number): void {
+    this.wipeBrushRadius = Math.max(6, Math.min(80, radius));
   }
 
   /**
