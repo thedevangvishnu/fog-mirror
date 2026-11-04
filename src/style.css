@@ -587,3 +587,36 @@ html, body {
     var(--corner-line) bottom right / 2px 28px;
   filter: drop-shadow(0 1px 2px rgb(0 0 0 / 65%));
 }
+
+button.hud-btn[aria-label],
+.photo-preview > button[aria-label] {
+  position: relative;
+}
+
+button.hud-btn[aria-label]::after,
+.photo-preview > button[aria-label]::after {
+  content: attr(aria-label);
+  position: absolute;
+  z-index: 2;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 9px;
+  border: var(--glass-border);
+  border-radius: 8px;
+  background: rgb(14 18 24 / 84%);
+  color: white;
+  font: 500 12px var(--font-apple);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+
+:is(button.hud-btn, .photo-preview > button)[aria-label]:is(:hover, :focus-visible)::after {
+  opacity: 1;
+}
+
+.photo-preview > button[aria-label]::after {
+  top: 8px;
+  bottom: auto;
+}

@@ -63,40 +63,40 @@ export class HUD {
 
         <div class="hud-divider"></div>
 
-        <button class="hud-btn" id="btn-sound" title="Toggle ASMR Sound (M)">
+        <button class="hud-btn" id="btn-sound" aria-label="Mute sound (M)">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
             <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.08"></path>
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-settings" title="Settings" aria-label="Settings">
+        <button class="hud-btn" id="btn-settings" aria-label="Settings">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-fog" title="Steam Up Glass (F)">
+        <button class="hud-btn" id="btn-fog" aria-label="Fog up the mirror (F)">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-clear" title="Erase all fog (C)" aria-label="Erase all fog">
+        <button class="hud-btn" id="btn-clear" aria-label="Erase all fog (C)">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="m7 21-4-4a2 2 0 0 1 0-3l9-10a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 8H7Zm0-11 11 10M13 21h9"></path>
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-photo" title="Take photo" aria-label="Take photo">
+        <button class="hud-btn" id="btn-photo" aria-label="Take photo">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 6h4l2-3h4l2 3h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"></path>
             <circle cx="12" cy="13" r="4"></circle>
           </svg>
         </button>
 
-        <button class="hud-btn" id="btn-fullscreen" title="Fullscreen">
+        <button class="hud-btn" id="btn-fullscreen" aria-label="Enter fullscreen">
           <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
           </svg>
@@ -140,7 +140,7 @@ export class HUD {
         </div>
 
         <div class="modal-actions">
-          <button class="hud-btn hud-btn-label" id="settings-done">Done</button>
+          <button class="hud-btn hud-btn-label" id="settings-done" aria-label="Done with settings">Done</button>
         </div>
       </div>
     `;
@@ -165,9 +165,9 @@ export class HUD {
     this.photoPreview.innerHTML = `
       <button type="button" data-photo-view aria-label="Open photo preview"><img alt="Latest Fog Mirror photo"></button>
       <div class="photo-actions">
-        <button type="button" class="hud-btn hud-btn-label" data-photo-view>View</button>
-        <button type="button" class="hud-btn hud-btn-label" data-photo-save>Save</button>
-        <button type="button" class="hud-btn hud-btn-label" data-photo-remove>Dismiss</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-view aria-label="View full photo">View</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-save aria-label="Save photo as PNG">Save</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-remove aria-label="Dismiss photo">Dismiss</button>
       </div>
     `;
     this.photoDialog = document.createElement('dialog');
@@ -176,9 +176,9 @@ export class HUD {
     this.photoDialog.innerHTML = `
       <img alt="Fog Mirror photo">
       <div class="photo-actions">
-        <button type="button" class="hud-btn hud-btn-label" data-photo-close>Close view</button>
-        <button type="button" class="hud-btn hud-btn-label" data-photo-save>Save</button>
-        <button type="button" class="hud-btn hud-btn-label" data-photo-remove>Dismiss</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-close aria-label="Close view">Close view</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-save aria-label="Save photo as PNG">Save</button>
+        <button type="button" class="hud-btn hud-btn-label" data-photo-remove aria-label="Dismiss photo">Dismiss</button>
       </div>
     `;
     document.body.append(this.photoCountdown, this.photoFrame, this.photoPreview, this.photoDialog);
@@ -221,7 +221,7 @@ export class HUD {
     btnSound.addEventListener('click', () => {
       const isMuted = this.callbacks.onToggleSound();
       btnSound.classList.toggle('active', !isMuted);
-      btnSound.title = isMuted ? 'Unmute ASMR Sound (M)' : 'Mute ASMR Sound (M)';
+      btnSound.setAttribute('aria-label', isMuted ? 'Unmute sound (M)' : 'Mute sound (M)');
     });
 
     btnSettings.addEventListener('click', () => {
@@ -240,6 +240,9 @@ export class HUD {
     btnClear.addEventListener('click', () => this.callbacks.onClearFog());
     btnPhoto.addEventListener('click', () => void this.startPhoto());
     btnFullscreen.addEventListener('click', () => this.callbacks.onToggleFullscreen());
+    document.addEventListener('fullscreenchange', () => {
+      btnFullscreen.setAttribute('aria-label', document.fullscreenElement ? 'Exit fullscreen' : 'Enter fullscreen');
+    });
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
