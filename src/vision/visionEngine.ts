@@ -34,7 +34,7 @@ export class VisionEngine {
   private lastVideoTime: number = -1;
 
   public mouthThreshold: number = 0.14;
-  public pinchThreshold: number = 0.07;
+  public pinchThreshold: number = 0.09;
 
   async init(onProgress?: (status: string) => void): Promise<void> {
     onProgress?.('Loading Vision WebAssembly...');
@@ -194,11 +194,12 @@ export class VisionEngine {
           const indexMcp = landmarks[5];
           const pinkyMcp = landmarks[17];
 
-          // 1. Pinch detection (3D distance between thumb tip and index tip)
+          // 1. Pinch detection — 2D XY only. Z is excluded: MediaPipe's depth
+          //    values are noisy at webcam distances and cause false triggers on
+          //    relaxed open hands. Screen-space XY is stable and sufficient.
           const pinchDist = Math.hypot(
             indexTip.x - thumbTip.x,
-            indexTip.y - thumbTip.y,
-            (indexTip.z ?? 0) - (thumbTip.z ?? 0)
+            indexTip.y - thumbTip.y
           );
           const isPinching = pinchDist < this.pinchThreshold;
 
