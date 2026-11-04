@@ -44,6 +44,7 @@ export class VisionEngine {
         modelAssetPath: '/models/face_landmarker.task',
         delegate: 'GPU'
       },
+      outputFaceBlendshapes: true,
       runningMode: 'VIDEO',
       numFaces: 1,
       minFaceDetectionConfidence: 0.5,
@@ -103,28 +104,70 @@ export class VisionEngine {
         const landmarks = faceResults.faceLandmarks[0];
 
         // Key landmarks:
-        // 13: Inner upper lip
-        // 14: Inner lower lip
-        // 10: Forehead top
-        // 152: Chin bottom
+        // 13: Inner upper lip, 14: Inner lower lip
+        // 61: Left lip corner, 291: Right lip corner
+        // 10: Forehead top, 152: Chin bottom
+        // 33: Left eye inner, 263: Right eye inner
         const topLip = landmarks[13];
         const bottomLip = landmarks[14];
+        const leftCorner = landmarks[61];
+        const rightCorner = landmarks[291];
         const forehead = landmarks[10];
         const chin = landmarks[152];
+        const leftEye = landmarks[33];
+        const rightEye = landmarks[263];
 
-        const mouthDist = Math.hypot(topLip.x - bottomLip.x, topLip.y - bottomLip.y);
+        const mouthHeight = Math.hypot(topLip.x - bottomLip.x, topLip.y - bottomLip.y);
+        const mouthWidth = Math.hypot(leftCorner.x - rightCorner.x, leftCorner.y - rightCorner.y);
         const faceHeight = Math.hypot(forehead.x - chin.x, forehead.y - chin.y);
+        const eyeDist = Math.hypot(leftEye.x - rightEye.x, leftEye.y - rightEye.y);
 
-        const openness = faceHeight > 0.05 ? mouthDist / faceHeight : 0;
-        const normalizedOpenness = Math.max(0, Math.min(1, (openness - 0.06) / 0.22));
+        // Normalized metrics
+        const verticalOpenness = faceHeight > 0.05 ? mouthHeight / faceHeight : 0;
+        const normalizedMouthWidth = eyeDist > 0.05 ? mouthWidth / eyeDist : 1;
+
+        // Circularity / Pucker ratio: as you make an "O", mouth narrows horizontally
+        const circularity = mouthWidth > 0.01 ? mouthHeight / mouthWidth : 0;
+
+        // Check MediaPipe blendshapes if available
+        let blendshapePucker = 0;
+        let blendshapeFunnel = 0;
+        let blendshapeJawOpen = 0;
+
+        if (faceResults.faceBlendshapes && faceResults.faceBlendshapes.length > 0) {
+          const categories = faceResults.faceBlendshapes[0].categories;
+          for (const cat of categories) {
+            if (cat.categoryName === 'mouthPucker') blendshapePucker = cat.score;
+            if (cat.categoryName === 'mouthFunnel') blendshapeFunnel = cat.score;
+            if (cat.categoryName === 'jawOpen') blendshapeJawOpen = cat.score;
+          }
+        }
+
+        // Detection triggers:
+        // Case A: Whistle / Small "O" posture (puckered lips with circular opening)
+        const isPuckeredO = (circularity > 0.42 && normalizedMouthWidth < 0.85 && mouthHeight > 0.012) ||
+                            (blendshapePucker > 0.35 || blendshapeFunnel > 0.32);
+
+        // Case B: Wide open mouth "HA" posture
+        const isWideOpen = verticalOpenness > 0.16 || blendshapeJawOpen > 0.35;
+
+        const isBlowing = isPuckeredO || isWideOpen;
+
+        // Calculate combined intensity
+        let opennessRatio = 0;
+        if (isPuckeredO) {
+          opennessRatio = Math.max(blendshapePucker, blendshapeFunnel, Math.min(1, circularity * 0.9));
+        } else if (isWideOpen) {
+          opennessRatio = Math.min(1, Math.max(0, (verticalOpenness - 0.08) / 0.18));
+        }
 
         // Mirrored coordinate so it lines up with mirrored video view
         const mouthX = (1 - (topLip.x + bottomLip.x) * 0.5);
         const mouthY = (topLip.y + bottomLip.y) * 0.5;
 
         breath = {
-          isBlowing: openness > this.mouthThreshold,
-          opennessRatio: normalizedOpenness,
+          isBlowing,
+          opennessRatio,
           mouthCenter: { x: mouthX, y: mouthY }
         };
       }
