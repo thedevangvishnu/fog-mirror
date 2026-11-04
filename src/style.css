@@ -65,27 +65,44 @@ html, body {
 /* Fingertip spatial tracking ring */
 .finger-cursor {
   position: absolute;
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0) 70%);
+  border: 1.5px dashed rgba(255, 255, 255, 0.4);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 4;
-  transition: width 0.1s ease, height 0.1s ease, opacity 0.15s ease;
+  transition: width 0.12s ease, height 0.12s ease, border-color 0.15s ease, opacity 0.15s ease;
   opacity: 0;
 }
 
 .finger-cursor.active {
+  opacity: 0.85;
+}
+
+/* Precision Pinch Wiping */
+.finger-cursor.wiping.pinching {
+  width: 24px;
+  height: 24px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: #38bdf8;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.5) 0%, rgba(56, 189, 248, 0.05) 75%);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);
   opacity: 1;
 }
 
-.finger-cursor.pinching {
-  width: 28px;
-  height: 28px;
-  border-color: #38bdf8;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.4) 0%, transparent 70%);
+/* Broad Fist Squeegee Wiping */
+.finger-cursor.wiping.fist {
+  width: 68px;
+  height: 68px;
+  border-style: solid;
+  border-width: 2px;
+  border-color: #818cf8;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.35) 0%, transparent 80%);
+  box-shadow: 0 0 16px rgba(129, 140, 248, 0.5);
+  opacity: 1;
 }
 
 /* --- HUD & Minimalist Frosted Dock --- */

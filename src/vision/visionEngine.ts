@@ -23,6 +23,7 @@ export interface HandPointer {
   x: number;
   y: number;
   isPinching: boolean;
+  isFist: boolean;
   pinchDistance: number;
 }
 
@@ -32,7 +33,8 @@ export class VisionEngine {
   private isReady: boolean = false;
   private lastVideoTime: number = -1;
 
-  public mouthThreshold: number = 0.16; // default sensitivity
+  public mouthThreshold: number = 0.14;
+  public pinchThreshold: number = 0.07;
 
   async init(onProgress?: (status: string) => void): Promise<void> {
     onProgress?.('Loading Vision WebAssembly...');
@@ -175,33 +177,62 @@ export class VisionEngine {
       // Frame skip protection
     }
 
-    // 2. Hand landmarks for wiping
+    // 2. Hand landmarks for intentional wiping (Pinch or Fist)
     const pointers: HandPointer[] = [];
     try {
       const handResults = this.handLandmarker.detectForVideo(video, nowMs);
       if (handResults.landmarks && handResults.landmarks.length > 0) {
         for (const landmarks of handResults.landmarks) {
-          // Landmark 8: Index finger tip
-          // Landmark 4: Thumb tip
-          const indexTip = landmarks[8];
+          const wrist = landmarks[0];
           const thumbTip = landmarks[4];
+          const indexTip = landmarks[8];
+          const middleTip = landmarks[12];
+          const ringTip = landmarks[16];
+          const pinkyTip = landmarks[20];
 
-          // Mirrored coordinate
-          const x = 1 - indexTip.x;
-          const y = indexTip.y;
+          // Knuckle joints
+          const indexMcp = landmarks[5];
+          const pinkyMcp = landmarks[17];
 
-          const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-          const isPinching = pinchDist < 0.09;
+          // 1. Pinch detection (3D distance between thumb tip and index tip)
+          const pinchDist = Math.hypot(
+            indexTip.x - thumbTip.x,
+            indexTip.y - thumbTip.y,
+            (indexTip.z ?? 0) - (thumbTip.z ?? 0)
+          );
+          const isPinching = pinchDist < this.pinchThreshold;
+
+          // 2. Closed Fist detection (all non-thumb fingertips curled tightly towards knuckles/wrist)
+          const handScale = Math.hypot(wrist.x - indexMcp.x, wrist.y - indexMcp.y) || 0.1;
+          const isFist = (
+            Math.hypot(indexTip.x - indexMcp.x, indexTip.y - indexMcp.y) < handScale * 0.65 &&
+            Math.hypot(middleTip.x - wrist.x, middleTip.y - wrist.y) < handScale * 1.1 &&
+            Math.hypot(ringTip.x - wrist.x, ringTip.y - wrist.y) < handScale * 1.1 &&
+            Math.hypot(pinkyTip.x - pinkyMcp.x, pinkyTip.y - pinkyMcp.y) < handScale * 0.65
+          );
+
+          // Pointer position: pinch midpoint if pinching, hand center if fist, else index tip for hover
+          let targetX = indexTip.x;
+          let targetY = indexTip.y;
+
+          if (isPinching) {
+            targetX = (indexTip.x + thumbTip.x) * 0.5;
+            targetY = (indexTip.y + thumbTip.y) * 0.5;
+          } else if (isFist) {
+            targetX = (indexMcp.x + pinkyMcp.x) * 0.5;
+            targetY = (indexMcp.y + pinkyMcp.y) * 0.5;
+          }
 
           pointers.push({
-            x,
-            y,
+            x: 1 - targetX, // Mirrored
+            y: targetY,
             isPinching,
+            isFist,
             pinchDistance: pinchDist
           });
         }
       }
-    } catch (err) {
+    } catch {
       // Frame skip protection
     }
 

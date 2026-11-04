@@ -139,11 +139,18 @@ export class FogCanvas {
   }
 
   /**
-   * Wipe away steam at specific mirrored coordinates using destination-out
+   * Wipe away steam at specific mirrored coordinates using destination-out.
+   * Only wipes when isWiping is true (intentional gesture).
    */
-  wipeAt(pointerId: number, normX: number, normY: number): void {
+  wipeAt(pointerId: number, normX: number, normY: number, isWiping: boolean = true): void {
     const x = normX * this.width;
     const y = normY * this.height;
+
+    // If not wiping (hovering), track position so pinch/fist starts cleanly without jumps
+    if (!isWiping) {
+      this.lastWipePositions.set(pointerId, { x, y });
+      return;
+    }
 
     const lastPos = this.lastWipePositions.get(pointerId) || { x, y };
     const dx = x - lastPos.x;
@@ -158,7 +165,7 @@ export class FogCanvas {
     this.offscreenCtx.globalCompositeOperation = 'destination-out';
 
     // Interpolate steps along stroke to avoid broken bead lines on fast finger swipes
-    const steps = Math.max(1, Math.ceil(dist / 6));
+    const steps = Math.max(1, Math.ceil(dist / 4));
     for (let i = 0; i <= steps; i++) {
       const curX = lastPos.x + (dx * i) / steps;
       const curY = lastPos.y + (dy * i) / steps;

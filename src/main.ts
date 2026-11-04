@@ -153,7 +153,7 @@ class FogMirrorApp {
     requestAnimationFrame(() => this.loop());
   }
 
-  private handleVisionPointers(pointers: { x: number; y: number; isPinching: boolean }[]): void {
+  private handleVisionPointers(pointers: { x: number; y: number; isPinching: boolean; isFist: boolean }[]): void {
     for (let i = 0; i < this.fingerCursors.length; i++) {
       const cursor = this.fingerCursors[i];
       const pointer = pointers[i];
@@ -165,12 +165,16 @@ class FogMirrorApp {
         cursor.style.left = `${screenX}px`;
         cursor.style.top = `${screenY}px`;
         cursor.classList.add('active');
-        cursor.classList.toggle('pinching', pointer.isPinching);
 
-        // Wipe fog at fingertip
-        this.fog.wipeAt(i, pointer.x, pointer.y);
+        const isWiping = pointer.isPinching || pointer.isFist;
+        cursor.classList.toggle('pinching', pointer.isPinching);
+        cursor.classList.toggle('fist', pointer.isFist);
+        cursor.classList.toggle('wiping', isWiping);
+
+        // Wipe fog only when an intentional gesture is active
+        this.fog.wipeAt(i, pointer.x, pointer.y, isWiping);
       } else {
-        cursor.classList.remove('active');
+        cursor.classList.remove('active', 'pinching', 'fist', 'wiping');
         this.fog.resetPointer(i);
       }
     }
