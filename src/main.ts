@@ -133,7 +133,8 @@ class FogMirrorApp {
         mouthBlow = breath.opennessRatio;
       }
       if (breath.mouthCenter) {
-        mouthCenter = breath.mouthCenter;
+        const mappedMouth = this.mapVideoToScreen(breath.mouthCenter.x, breath.mouthCenter.y);
+        mouthCenter = { x: mappedMouth.normScreenX, y: mappedMouth.normScreenY };
       }
 
       // Process Hand Pointers for wiping
@@ -159,17 +160,64 @@ class FogMirrorApp {
     requestAnimationFrame(() => this.loop());
   }
 
+  /**
+   * Map normalized camera video coordinates [0, 1] to screen coordinates,
+   * accurately compensating for CSS `object-fit: cover` letterboxing/cropping.
+   */
+  private mapVideoToScreen(normX: number, normY: number): {
+    x: number;
+    y: number;
+    normScreenX: number;
+    normScreenY: number;
+  } {
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const vidW = this.video.videoWidth || 1280;
+    const vidH = this.video.videoHeight || 720;
+
+    const windowAspect = winW / winH;
+    const videoAspect = vidW / vidH;
+
+    let renderW: number;
+    let renderH: number;
+    let offsetX: number;
+    let offsetY: number;
+
+    if (windowAspect < videoAspect) {
+      // Window is taller than video: video height fits window, left/right are cropped
+      renderH = winH;
+      renderW = vidW * (winH / vidH);
+      offsetX = (winW - renderW) * 0.5;
+      offsetY = 0;
+    } else {
+      // Window is wider than video: video width fits window, top/bottom are cropped
+      renderW = winW;
+      renderH = vidH * (winW / vidW);
+      offsetX = 0;
+      offsetY = (winH - renderH) * 0.5;
+    }
+
+    const screenX = offsetX + normX * renderW;
+    const screenY = offsetY + normY * renderH;
+
+    return {
+      x: screenX,
+      y: screenY,
+      normScreenX: screenX / winW,
+      normScreenY: screenY / winH
+    };
+  }
+
   private handleVisionPointers(pointers: { x: number; y: number; isPinching: boolean; isFist: boolean }[]): void {
     for (let i = 0; i < this.fingerCursors.length; i++) {
       const cursor = this.fingerCursors[i];
       const pointer = pointers[i];
 
       if (pointer) {
-        const screenX = pointer.x * window.innerWidth;
-        const screenY = pointer.y * window.innerHeight;
+        const mapped = this.mapVideoToScreen(pointer.x, pointer.y);
 
-        cursor.style.left = `${screenX}px`;
-        cursor.style.top = `${screenY}px`;
+        cursor.style.left = `${mapped.x}px`;
+        cursor.style.top = `${mapped.y}px`;
         cursor.classList.add('active');
 
         const isWiping = pointer.isPinching || pointer.isFist;
@@ -177,8 +225,8 @@ class FogMirrorApp {
         cursor.classList.toggle('fist', pointer.isFist);
         cursor.classList.toggle('wiping', isWiping);
 
-        // Wipe fog only when an intentional gesture is active
-        this.fog.wipeAt(i, pointer.x, pointer.y, isWiping);
+        // Wipe fog only when an intentional gesture is active, passing isFist for squeegee scaling
+        this.fog.wipeAt(i, mapped.normScreenX, mapped.normScreenY, isWiping, pointer.isFist);
       } else {
         cursor.classList.remove('active', 'pinching', 'fist', 'wiping');
         this.fog.resetPointer(i);

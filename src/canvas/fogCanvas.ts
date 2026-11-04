@@ -148,30 +148,58 @@ export class FogCanvas {
   /**
    * Wipe away steam at specific mirrored coordinates using destination-out.
    * Only wipes when isWiping is true (intentional gesture).
+   * Automatically widens for closed-fist squeegee erasing.
    */
-  wipeAt(pointerId: number, normX: number, normY: number, isWiping: boolean = true): void {
+  wipeAt(pointerId: number, normX: number, normY: number, isWiping: boolean = true, isFist: boolean = false): void {
     const x = normX * this.width;
     const y = normY * this.height;
 
-    // If not wiping (hovering), track position so pinch/fist starts cleanly without jumps
+    // If hovering (not actively wiping), reset pointer trail so stroke begins fresh upon pinch
     if (!isWiping) {
-      this.lastWipePositions.set(pointerId, { x, y });
+      this.lastWipePositions.delete(pointerId);
       return;
     }
 
-    const lastPos = this.lastWipePositions.get(pointerId) || { x, y };
+    const currentRadius = isFist
+      ? Math.max(54, this.wipeBrushRadius * 2.2)
+      : this.wipeBrushRadius;
+
+    const lastPos = this.lastWipePositions.get(pointerId);
+    if (!lastPos) {
+      // First frame of contact: stamp initial touch point
+      this.lastWipePositions.set(pointerId, { x, y });
+      this.offscreenCtx.save();
+      this.offscreenCtx.globalCompositeOperation = 'destination-out';
+      const grad = this.offscreenCtx.createRadialGradient(
+        x, y, currentRadius * 0.25,
+        x, y, currentRadius
+      );
+      grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+      grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.85)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      this.offscreenCtx.fillStyle = grad;
+      this.offscreenCtx.beginPath();
+      this.offscreenCtx.arc(x, y, currentRadius, 0, Math.PI * 2);
+      this.offscreenCtx.fill();
+      this.offscreenCtx.restore();
+      return;
+    }
+
     const dx = x - lastPos.x;
     const dy = y - lastPos.y;
     const dist = Math.hypot(dx, dy);
 
-    if (dist > 2) {
-      this.onWipeMove?.(dist);
+    // Movement gating: prevent continuous erosion while held completely still
+    if (dist < 2.0) {
+      return;
     }
+
+    this.onWipeMove?.(dist);
 
     this.offscreenCtx.save();
     this.offscreenCtx.globalCompositeOperation = 'destination-out';
 
-    // Interpolate steps along stroke to avoid broken bead lines on fast finger swipes
+    // Interpolate steps along stroke to guarantee continuous connected line
     const steps = Math.max(1, Math.ceil(dist / 4));
     for (let i = 0; i <= steps; i++) {
       const curX = lastPos.x + (dx * i) / steps;
@@ -180,10 +208,10 @@ export class FogCanvas {
       const grad = this.offscreenCtx.createRadialGradient(
         curX,
         curY,
-        this.wipeBrushRadius * 0.25,
+        currentRadius * 0.25,
         curX,
         curY,
-        this.wipeBrushRadius
+        currentRadius
       );
       grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
       grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.85)');
@@ -191,7 +219,7 @@ export class FogCanvas {
 
       this.offscreenCtx.fillStyle = grad;
       this.offscreenCtx.beginPath();
-      this.offscreenCtx.arc(curX, curY, this.wipeBrushRadius, 0, Math.PI * 2);
+      this.offscreenCtx.arc(curX, curY, currentRadius, 0, Math.PI * 2);
       this.offscreenCtx.fill();
     }
 
