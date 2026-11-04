@@ -12,6 +12,7 @@ import {
   FaceLandmarker,
   HandLandmarker
 } from '@mediapipe/tasks-vision';
+import { OneEuroFilter } from './oneEuroFilter';
 
 export interface BreathDetectionResult {
   isBlowing: boolean;
@@ -27,14 +28,24 @@ export interface HandPointer {
   pinchDistance: number;
 }
 
+interface LandmarkFilterPair {
+  x: OneEuroFilter;
+  y: OneEuroFilter;
+}
+
 export class VisionEngine {
   private faceLandmarker: FaceLandmarker | null = null;
   private handLandmarker: HandLandmarker | null = null;
   private isReady: boolean = false;
   private lastVideoTime: number = -1;
 
+  // Smoothing filters: 21 landmarks per hand, 2 hands
+  private handFilters: LandmarkFilterPair[][] = [];
+  private prevPinchingState: boolean[] = [false, false];
+  private prevFistState: boolean[] = [false, false];
+
   public mouthThreshold: number = 0.14;
-  public pinchThreshold: number = 0.09;
+  public pinchThreshold: number = 0.075;
 
   async init(onProgress?: (status: string) => void): Promise<void> {
     onProgress?.('Loading Vision WebAssembly...');
@@ -181,8 +192,40 @@ export class VisionEngine {
     const pointers: HandPointer[] = [];
     try {
       const handResults = this.handLandmarker.detectForVideo(video, nowMs);
-      if (handResults.landmarks && handResults.landmarks.length > 0) {
-        for (const landmarks of handResults.landmarks) {
+      const detectedCount = handResults.landmarks ? handResults.landmarks.length : 0;
+
+      // Reset filters for lost hands
+      for (let h = detectedCount; h < this.handFilters.length; h++) {
+        if (this.handFilters[h]) {
+          this.handFilters[h].forEach(f => {
+            f.x.reset();
+            f.y.reset();
+          });
+        }
+        this.prevPinchingState[h] = false;
+        this.prevFistState[h] = false;
+      }
+
+      if (detectedCount > 0 && handResults.landmarks) {
+        for (let handIdx = 0; handIdx < handResults.landmarks.length; handIdx++) {
+          const rawLandmarks = handResults.landmarks[handIdx];
+
+          // Initialize OneEuroFilter bank for this hand if needed
+          if (!this.handFilters[handIdx]) {
+            this.handFilters[handIdx] = Array.from({ length: 21 }, () => ({
+              x: new OneEuroFilter(60, 0.9, 0.05),
+              y: new OneEuroFilter(60, 0.9, 0.05)
+            }));
+          }
+
+          // Smooth each landmark coordinate
+          const filters = this.handFilters[handIdx];
+          const landmarks = rawLandmarks.map((pt, i) => ({
+            x: filters[i].x.filter(pt.x, nowMs),
+            y: filters[i].y.filter(pt.y, nowMs),
+            z: pt.z
+          }));
+
           const wrist = landmarks[0];
           const thumbTip = landmarks[4];
           const indexTip = landmarks[8];
@@ -191,21 +234,8 @@ export class VisionEngine {
           const indexMcp = landmarks[5];
           const pinkyMcp = landmarks[17];
 
-          // 1. Pinch detection — 2D XY only. Z is excluded: MediaPipe's depth
-          //    values are noisy at webcam distances and cause false triggers on
-          //    relaxed open hands. Screen-space XY is stable and sufficient.
-          const pinchDist = Math.hypot(
-            indexTip.x - thumbTip.x,
-            indexTip.y - thumbTip.y
-          );
-          const isPinching = pinchDist < this.pinchThreshold;
-
-          // 2. Closed Fist detection — per-finger curl ratio (scale-invariant).
-          //    For each non-thumb finger: curlRatio = tipToMcp / mcpToWrist.
-          //    A curled finger has its tip close to its MCP relative to the
-          //    MCP-to-wrist segment, yielding a low ratio. Threshold < 0.85.
-          //    Works at any hand distance from camera; purely 2D XY.
-          const fingersCurled = ([
+          // 1. Closed Fist detection — per-finger curl ratio (scale-invariant) with hysteresis
+          const fingersCurledRatios = ([
             [5, 8],   // index  MCP → tip
             [9, 12],  // middle MCP → tip
             [13, 16], // ring   MCP → tip
@@ -215,12 +245,42 @@ export class VisionEngine {
             const tip = landmarks[tipIdx];
             const tipToMcp = Math.hypot(tip.x - mcp.x, tip.y - mcp.y);
             const mcpToWrist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
-            if (mcpToWrist < 0.01) return false; // degenerate guard
-            return (tipToMcp / mcpToWrist) < 0.85;
+            if (mcpToWrist < 0.01) return 1.0;
+            return tipToMcp / mcpToWrist;
           });
-          const isFist = fingersCurled.every(Boolean);
 
-          // Pointer position: pinch midpoint if pinching, hand center if fist, else index tip for hover
+          const wasFist = this.prevFistState[handIdx] ?? false;
+          // Fist hysteresis: enter at < 0.80, exit when any finger extends > 0.95
+          let isFist = false;
+          if (wasFist) {
+            isFist = fingersCurledRatios.every(r => r < 0.95);
+          } else {
+            isFist = fingersCurledRatios.every(r => r < 0.80);
+          }
+          this.prevFistState[handIdx] = isFist;
+
+          // 2. Pinch detection — 2D XY distance with hysteresis
+          const pinchDist = Math.hypot(
+            indexTip.x - thumbTip.x,
+            indexTip.y - thumbTip.y
+          );
+
+          const wasPinching = this.prevPinchingState[handIdx] ?? false;
+          const onThreshold = this.pinchThreshold; // e.g. 0.075
+          const offThreshold = this.pinchThreshold * 1.35; // e.g. 0.10
+
+          let isPinching = false;
+          if (!isFist) {
+            // Cannot pinch if all fingers are curled into a fist
+            if (wasPinching) {
+              isPinching = pinchDist < offThreshold;
+            } else {
+              isPinching = pinchDist < onThreshold;
+            }
+          }
+          this.prevPinchingState[handIdx] = isPinching;
+
+          // Pointer position: pinch midpoint if pinching, palm center if fist, else index tip for hover
           let targetX = indexTip.x;
           let targetY = indexTip.y;
 
