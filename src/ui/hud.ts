@@ -110,9 +110,9 @@ export class HUD {
           <p class="modal-desc">Fine-tune hand tracking and gesture sensitivity.</p>
           
           <div class="modal-field">
-            <label>Pinch Trigger Distance: <b id="val-pinch">0.07</b></label>
-            <input type="range" id="slider-pinch" min="0.04" max="0.14" step="0.01" value="0.07" class="modal-slider" />
-            <span class="field-hint">Higher values make pinching easier; lower values require closer finger contact.</span>
+            <label>Pinch Trigger Distance: <b id="val-pinch">0.075</b></label>
+            <input type="range" id="slider-pinch" min="0.04" max="0.14" step="0.005" value="0.075" class="modal-slider" />
+            <span class="field-hint">Distance threshold to start wiping. Once engaged, releasing has built-in hysteresis for smooth continuous drawing.</span>
           </div>
 
           <div class="modal-actions">
