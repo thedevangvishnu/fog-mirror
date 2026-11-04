@@ -43,9 +43,10 @@ export class VisionEngine {
   private handFilters: LandmarkFilterPair[][] = [];
   private prevPinchingState: boolean[] = [false, false];
   private prevFistState: boolean[] = [false, false];
+  private fistHoldCounts: number[] = [0, 0];
 
   public mouthThreshold: number = 0.14;
-  public pinchThreshold: number = 0.075;
+  public pinchThreshold: number = 0.048;
 
   async init(onProgress?: (status: string) => void): Promise<void> {
     onProgress?.('Loading Vision WebAssembly...');
@@ -211,10 +212,11 @@ export class VisionEngine {
           const rawLandmarks = handResults.landmarks[handIdx];
 
           // Initialize OneEuroFilter bank for this hand if needed
+          // Tuned: minCutOff=1.2 (zero jitter when still), beta=0.5 (high-speed pencil responsiveness, zero lag)
           if (!this.handFilters[handIdx]) {
             this.handFilters[handIdx] = Array.from({ length: 21 }, () => ({
-              x: new OneEuroFilter(60, 0.9, 0.05),
-              y: new OneEuroFilter(60, 0.9, 0.05)
+              x: new OneEuroFilter(60, 1.2, 0.5),
+              y: new OneEuroFilter(60, 1.2, 0.5)
             }));
           }
 
@@ -233,52 +235,71 @@ export class VisionEngine {
           // Knuckle joints
           const indexMcp = landmarks[5];
           const pinkyMcp = landmarks[17];
+          const handScale = Math.hypot(wrist.x - indexMcp.x, wrist.y - indexMcp.y) || 0.1;
 
-          // 1. Closed Fist detection — per-finger curl ratio (scale-invariant) with hysteresis
-          const fingersCurledRatios = ([
-            [5, 8],   // index  MCP → tip
-            [9, 12],  // middle MCP → tip
-            [13, 16], // ring   MCP → tip
-            [17, 20], // pinky  MCP → tip
-          ] as [number, number][]).map(([mcpIdx, tipIdx]) => {
-            const mcp = landmarks[mcpIdx];
-            const tip = landmarks[tipIdx];
-            const tipToMcp = Math.hypot(tip.x - mcp.x, tip.y - mcp.y);
-            const mcpToWrist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
-            if (mcpToWrist < 0.01) return 1.0;
-            return tipToMcp / mcpToWrist;
-          });
-
-          const wasFist = this.prevFistState[handIdx] ?? false;
-          // Fist hysteresis: enter at < 0.80, exit when any finger extends > 0.95
-          let isFist = false;
-          if (wasFist) {
-            isFist = fingersCurledRatios.every(r => r < 0.95);
-          } else {
-            isFist = fingersCurledRatios.every(r => r < 0.80);
-          }
-          this.prevFistState[handIdx] = isFist;
-
-          // 2. Pinch detection — 2D XY distance with hysteresis
+          // 1. PINCH DETECTION COMES FIRST (PRIORITY)
+          // When writing, fingers naturally curl into palm while thumb and index pinch.
+          // Pinch MUST take absolute precedence over fist detection!
           const pinchDist = Math.hypot(
             indexTip.x - thumbTip.x,
             indexTip.y - thumbTip.y
           );
 
           const wasPinching = this.prevPinchingState[handIdx] ?? false;
-          const onThreshold = this.pinchThreshold; // e.g. 0.075
-          const offThreshold = this.pinchThreshold * 1.35; // e.g. 0.10
+          const onThreshold = this.pinchThreshold; // default 0.048 for true contact
+          const offThreshold = this.pinchThreshold * 1.45; // 0.070 release hysteresis
 
-          let isPinching = false;
-          if (!isFist) {
-            // Cannot pinch if all fingers are curled into a fist
-            if (wasPinching) {
-              isPinching = pinchDist < offThreshold;
-            } else {
-              isPinching = pinchDist < onThreshold;
-            }
-          }
+          const isPinching = wasPinching
+            ? pinchDist < offThreshold
+            : pinchDist < onThreshold;
           this.prevPinchingState[handIdx] = isPinching;
+
+          // 2. CLOSED FIST DETECTION (DISAMBIGUATED)
+          // If the user is pinching, it is NEVER a fist eraser!
+          let isFist = false;
+          if (isPinching) {
+            this.fistHoldCounts[handIdx] = 0;
+            this.prevFistState[handIdx] = false;
+          } else if (pinchDist > 0.075) {
+            // Check curl of all 4 fingers
+            const fingersCurledRatios = ([
+              [5, 8],   // index  MCP → tip
+              [9, 12],  // middle MCP → tip
+              [13, 16], // ring   MCP → tip
+              [17, 20], // pinky  MCP → tip
+            ] as [number, number][]).map(([mcpIdx, tipIdx]) => {
+              const mcp = landmarks[mcpIdx];
+              const tip = landmarks[tipIdx];
+              const tipToMcp = Math.hypot(tip.x - mcp.x, tip.y - mcp.y);
+              const mcpToWrist = Math.hypot(mcp.x - wrist.x, mcp.y - wrist.y);
+              if (mcpToWrist < 0.01) return 1.0;
+              return tipToMcp / mcpToWrist;
+            });
+
+            const nonThumbCurled = fingersCurledRatios.every(r => r < 0.72);
+
+            // In a real closed fist, the thumb MUST also be folded tight across the knuckles
+            const thumbToMcp = Math.hypot(thumbTip.x - indexMcp.x, thumbTip.y - indexMcp.y);
+            const thumbToWrist = Math.hypot(thumbTip.x - wrist.x, thumbTip.y - wrist.y);
+            const isThumbCurled = (thumbToMcp < handScale * 0.60) && (thumbToWrist < handScale * 0.88);
+
+            // Ensure hand is fully inside the camera frame (not entering from edge)
+            const isWellInsideFrame = wrist.x > 0.06 && wrist.x < 0.94 && wrist.y > 0.06 && wrist.y < 0.94;
+
+            const isCandidateFist = isWellInsideFrame && nonThumbCurled && isThumbCurled;
+            if (isCandidateFist) {
+              this.fistHoldCounts[handIdx]++;
+            } else {
+              this.fistHoldCounts[handIdx] = 0;
+            }
+
+            // Require 3 consecutive confirmed frames to activate squeegee eraser (prevents frame-entry blips)
+            isFist = this.fistHoldCounts[handIdx] >= 3;
+            this.prevFistState[handIdx] = isFist;
+          } else {
+            this.fistHoldCounts[handIdx] = 0;
+            this.prevFistState[handIdx] = false;
+          }
 
           // Pointer position: pinch midpoint if pinching, palm center if fist, else index tip for hover
           let targetX = indexTip.x;

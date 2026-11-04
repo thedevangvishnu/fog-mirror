@@ -29,7 +29,7 @@ export class FogCanvas {
 
   // Simulation physics
   public evaporationRate: number = 0.0006; // Slow natural drying
-  public wipeBrushRadius: number = 20; // Default refined brush radius
+  public wipeBrushRadius: number = 8; // Default crisp pencil writing radius
   public secretMessage: string = "clarity is an inner state";
   public showSecretMessage: boolean = true;
 
@@ -142,13 +142,13 @@ export class FogCanvas {
    * Set wiper brush radius
    */
   setBrushRadius(radius: number): void {
-    this.wipeBrushRadius = Math.max(6, Math.min(80, radius));
+    this.wipeBrushRadius = Math.max(3, Math.min(60, radius));
   }
 
   /**
    * Wipe away steam at specific mirrored coordinates using destination-out.
    * Only wipes when isWiping is true (intentional gesture).
-   * Automatically widens for closed-fist squeegee erasing.
+   * Pinch writing produces crisp, defined strokes; fist creates broad squeegee clearing.
    */
   wipeAt(pointerId: number, normX: number, normY: number, isWiping: boolean = true, isFist: boolean = false): void {
     const x = normX * this.width;
@@ -161,7 +161,7 @@ export class FogCanvas {
     }
 
     const currentRadius = isFist
-      ? Math.max(54, this.wipeBrushRadius * 2.2)
+      ? Math.max(52, this.wipeBrushRadius * 3.5)
       : this.wipeBrushRadius;
 
     const lastPos = this.lastWipePositions.get(pointerId);
@@ -171,11 +171,11 @@ export class FogCanvas {
       this.offscreenCtx.save();
       this.offscreenCtx.globalCompositeOperation = 'destination-out';
       const grad = this.offscreenCtx.createRadialGradient(
-        x, y, currentRadius * 0.25,
+        x, y, currentRadius * 0.15,
         x, y, currentRadius
       );
       grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-      grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.85)');
+      grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.95)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       this.offscreenCtx.fillStyle = grad;
       this.offscreenCtx.beginPath();
@@ -190,7 +190,7 @@ export class FogCanvas {
     const dist = Math.hypot(dx, dy);
 
     // Movement gating: prevent continuous erosion while held completely still
-    if (dist < 2.0) {
+    if (dist < 1.5) {
       return;
     }
 
@@ -200,7 +200,8 @@ export class FogCanvas {
     this.offscreenCtx.globalCompositeOperation = 'destination-out';
 
     // Interpolate steps along stroke to guarantee continuous connected line
-    const steps = Math.max(1, Math.ceil(dist / 4));
+    const stepSize = Math.max(2, currentRadius * 0.4);
+    const steps = Math.max(1, Math.ceil(dist / stepSize));
     for (let i = 0; i <= steps; i++) {
       const curX = lastPos.x + (dx * i) / steps;
       const curY = lastPos.y + (dy * i) / steps;
@@ -208,13 +209,13 @@ export class FogCanvas {
       const grad = this.offscreenCtx.createRadialGradient(
         curX,
         curY,
-        currentRadius * 0.25,
+        currentRadius * 0.15,
         curX,
         curY,
         currentRadius
       );
       grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
-      grad.addColorStop(0.75, 'rgba(0, 0, 0, 0.85)');
+      grad.addColorStop(0.85, 'rgba(0, 0, 0, 0.95)');
       grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
       this.offscreenCtx.fillStyle = grad;

@@ -51,8 +51,8 @@ export class HUD {
             <circle cx="12" cy="12" r="3"></circle>
             <circle cx="12" cy="12" r="8" stroke-dasharray="2 2"></circle>
           </svg>
-          <input type="range" id="slider-wiper" min="8" max="60" value="20" class="hud-slider" />
-          <span class="slider-badge" id="val-wiper">20px</span>
+          <input type="range" id="slider-wiper" min="4" max="40" value="8" class="hud-slider" />
+          <span class="slider-badge" id="val-wiper">8px</span>
         </div>
 
         <div class="hud-divider"></div>
@@ -110,9 +110,9 @@ export class HUD {
           <p class="modal-desc">Fine-tune hand tracking and gesture sensitivity.</p>
           
           <div class="modal-field">
-            <label>Pinch Trigger Distance: <b id="val-pinch">0.075</b></label>
-            <input type="range" id="slider-pinch" min="0.04" max="0.14" step="0.005" value="0.075" class="modal-slider" />
-            <span class="field-hint">Distance threshold to start wiping. Once engaged, releasing has built-in hysteresis for smooth continuous drawing.</span>
+            <label>Pinch Trigger Distance: <b id="val-pinch">0.048</b></label>
+            <input type="range" id="slider-pinch" min="0.025" max="0.080" step="0.002" value="0.048" class="modal-slider" />
+            <span class="field-hint">Distance threshold to start writing. Built-in hysteresis maintains clean, unbroken pencil strokes until fingers open.</span>
           </div>
 
           <div class="modal-actions">
