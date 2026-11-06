@@ -19,6 +19,7 @@ export class HUD {
   private breathMeter: HTMLElement;
   private statusText: HTMLElement;
   private settingsModal: HTMLElement;
+  private cameraModal: HTMLElement;
   private wiperSlider: HTMLInputElement;
   private wiperValueLabel: HTMLElement;
   private pinchSlider: HTMLInputElement;
@@ -39,72 +40,76 @@ export class HUD {
 
     this.container.innerHTML = `
       <div class="hud-pill">
-        <div class="hud-status-badge">
-          <span class="status-dot"></span>
-          <span class="status-label" id="hud-status">Initializing Vision...</span>
+        <div class="hud-row hud-top-row">
+          <div class="hud-status-badge">
+            <span class="status-dot"></span>
+            <span class="status-label" id="hud-status">Initializing Vision...</span>
+          </div>
+
+          <div class="breath-indicator" title="Breath Intensity">
+            <div class="breath-bar" id="breath-meter"></div>
+          </div>
+
+          <div class="hud-divider hud-desktop-divider"></div>
+
+          <div class="hud-slider-group" title="Air Pencil Width">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+              <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+              <path d="M2 2l7.586 7.586"></path>
+              <circle cx="11" cy="11" r="2"></circle>
+            </svg>
+            <input type="range" id="slider-wiper" min="3" max="30" value="6" class="hud-slider" />
+            <span class="slider-badge" id="val-wiper">6px</span>
+          </div>
         </div>
 
-        <div class="breath-indicator" title="Breath Intensity">
-          <div class="breath-bar" id="breath-meter"></div>
+        <div class="hud-divider hud-desktop-divider"></div>
+
+        <div class="hud-row hud-actions-row">
+          <button class="hud-btn" id="btn-sound" aria-label="Mute sound (M)" title="Sound (M)">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.08"></path>
+            </svg>
+          </button>
+
+          <button class="hud-btn" id="btn-settings" aria-label="Settings" title="Settings">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+
+          <button class="hud-btn" id="btn-fog" aria-label="Fog up the mirror (F)" title="Steam Up (F)">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
+            </svg>
+          </button>
+
+          <button class="hud-btn" id="btn-clear" aria-label="Erase all fog (C)" title="Clear Glass (C)">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="m7 21-4-4a2 2 0 0 1 0-3l9-10a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 8H7Zm0-11 11 10M13 21h9"></path>
+            </svg>
+          </button>
+
+          <button class="hud-btn" id="btn-photo" aria-label="Take photo" title="Take Photo">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 6h4l2-3h4l2 3h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+          </button>
+
+          <button class="hud-btn" id="btn-fullscreen" aria-label="Enter fullscreen" title="Fullscreen">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+            </svg>
+          </button>
         </div>
-
-        <div class="hud-divider"></div>
-
-        <div class="hud-slider-group" title="Air Pencil Width">
-          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 19l7-7 3 3-7 7-3-3z"></path>
-            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
-            <path d="M2 2l7.586 7.586"></path>
-            <circle cx="11" cy="11" r="2"></circle>
-          </svg>
-          <input type="range" id="slider-wiper" min="3" max="30" value="6" class="hud-slider" />
-          <span class="slider-badge" id="val-wiper">6px</span>
-        </div>
-
-        <div class="hud-divider"></div>
-
-        <button class="hud-btn" id="btn-sound" aria-label="Mute sound (M)">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.08"></path>
-          </svg>
-        </button>
-
-        <button class="hud-btn" id="btn-settings" aria-label="Settings">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-        </button>
-
-        <button class="hud-btn" id="btn-fog" aria-label="Fog up the mirror (F)">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"></path>
-          </svg>
-        </button>
-
-        <button class="hud-btn" id="btn-clear" aria-label="Erase all fog (C)">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="m7 21-4-4a2 2 0 0 1 0-3l9-10a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 8H7Zm0-11 11 10M13 21h9"></path>
-          </svg>
-        </button>
-
-        <button class="hud-btn" id="btn-photo" aria-label="Take photo">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 6h4l2-3h4l2 3h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"></path>
-            <circle cx="12" cy="13" r="4"></circle>
-          </svg>
-        </button>
-
-        <button class="hud-btn" id="btn-fullscreen" aria-label="Enter fullscreen">
-          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-          </svg>
-        </button>
       </div>
 
       <div class="hud-help-tip">
-        <span><b>Pinch fingers</b> to write &bull; <b>Closed fist</b> to squeegee erase &bull; Press <b>H</b> to hide controls</span>
+        <span><b>Pinch</b> to write &bull; <b>Fist</b> to wipe<span class="desktop-only"> &bull; Press <b>H</b> to hide controls</span></span>
       </div>
     `;
 
@@ -145,6 +150,37 @@ export class HUD {
       </div>
     `;
     document.body.appendChild(this.settingsModal);
+
+    // 3. Camera Permission Card (Prompt when camera is blocked or denied)
+    this.cameraModal = document.createElement('div');
+    this.cameraModal.className = 'permission-modal hidden';
+    this.cameraModal.id = 'camera-modal';
+    this.cameraModal.innerHTML = `
+      <div class="permission-card">
+        <div class="permission-icon-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+            <circle cx="12" cy="13" r="3"></circle>
+          </svg>
+        </div>
+        <h3 class="permission-title">Camera Access Required</h3>
+        <p class="permission-desc">
+          Fog Mirror needs your camera to turn your screen into a steamy mirror and track your air-writing gestures.
+        </p>
+        <div class="permission-guide">
+          <div class="guide-item">
+            <span class="guide-badge">1</span>
+            <span>Tap the <b>camera</b> or <b>lock icon</b> in your browser address bar</span>
+          </div>
+          <div class="guide-item">
+            <span class="guide-badge">2</span>
+            <span>Set camera permissions to <b>Allow</b></span>
+          </div>
+        </div>
+        <button class="permission-btn" id="btn-enable-camera">Enable Camera</button>
+      </div>
+    `;
+    document.body.appendChild(this.cameraModal);
 
     this.breathMeter = document.getElementById('breath-meter')!;
     this.statusText = document.getElementById('hud-status')!;
@@ -376,5 +412,19 @@ export class HUD {
     this.isVisible = !this.isVisible;
     this.container.style.opacity = this.isVisible ? '1' : '0';
     this.container.style.pointerEvents = this.isVisible ? 'auto' : 'none';
+  }
+
+  showCameraPermission(onRequest: () => void): void {
+    this.cameraModal.classList.remove('hidden');
+    const btn = document.getElementById('btn-enable-camera');
+    if (btn) {
+      btn.onclick = () => {
+        onRequest();
+      };
+    }
+  }
+
+  hideCameraPermission(): void {
+    this.cameraModal.classList.add('hidden');
   }
 }

@@ -93,6 +93,8 @@ class FogMirrorApp {
         audio: true
       });
 
+      this.hud.hideCameraPermission();
+
       this.video.srcObject = stream;
       await new Promise<void>((resolve) => {
         this.video.onloadedmetadata = () => {
@@ -113,11 +115,10 @@ class FogMirrorApp {
       requestAnimationFrame(() => this.loop());
     } catch (err: unknown) {
       console.error('Camera or initialization error:', err);
-      this.hud.setStatus('Camera blocked. Mouse wipe enabled.');
-
-      // Allow running even without camera using fallback mouse
-      this.isRunning = true;
-      requestAnimationFrame(() => this.loop());
+      this.hud.setStatus('');
+      this.hud.showCameraPermission(() => {
+        this.start();
+      });
     }
   }
 
