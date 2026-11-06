@@ -177,7 +177,7 @@ export class HUD {
             <span>Set camera permissions to <b>Allow</b></span>
           </div>
         </div>
-        <button class="permission-btn" id="btn-enable-camera">Enable Camera</button>
+        <button class="permission-btn" id="btn-enable-camera">I have allowed access</button>
       </div>
     `;
     document.body.appendChild(this.cameraModal);
